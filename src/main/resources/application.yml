@@ -1,0 +1,16 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: market-ingest-streamer
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+
+upbit:
+  websocket:
+    uri: wss://api.upbit.com/websocket/v1
