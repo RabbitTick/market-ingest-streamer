@@ -1,0 +1,375 @@
+package com.rabbittick.streamer.connector;
+
+import java.net.URI;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.beans.factory.DisposableBean;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
+import org.springframework.core.env.Environment;
+import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.socket.WebSocketMessage;
+import org.springframework.web.reactive.socket.WebSocketSession;
+import org.springframework.web.reactive.socket.client.WebSocketClient;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rabbittick.streamer.connector.dto.upbit.UpbitTickerDto;
+import com.rabbittick.streamer.converter.UpbitDataConverter;
+import com.rabbittick.streamer.global.dto.MarketDataMessage;
+import com.rabbittick.streamer.service.MarketDataService;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import reactor.core.Disposable;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.util.retry.Retry;
+
+/**
+ * Upbit WebSocket API 연결 및 실시간 데이터 수집을 담당하는 커넥터.
+ *
+ * <p>주요 책임:
+ * <ul>
+ *   <li>Upbit WebSocket 연결 생명주기 관리</li>
+ *   <li>실시간 ticker 데이터 수신 및 파싱</li>
+ *   <li>연결 실패 시 자동 재연결</li>
+ *   <li>60초 주기 Ping/Pong 메커니즘으로 연결 유지</li>
+ * </ul>
+ *
+ * <p>애플리케이션 시작 완료 후 자동으로 WebSocket 연결을 시작하며,
+ * 애플리케이션 종료 시 연결을 정리한다.
+ */
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class UpbitConnector implements DisposableBean {
+
+	private final WebSocketClient webSocketClient;
+	private final MarketDataService marketDataService;
+	private final UpbitDataConverter upbitDataConverter;
+	private final ObjectMapper objectMapper;
+
+	private static final URI UPBIT_WEBSOCKET_URI = URI.create("wss://api.upbit.com/websocket/v1");
+	private static final Duration PING_INTERVAL = Duration.ofSeconds(60);
+
+	/**
+	 * 사용할 마켓코드 환경 설정 (development, production, full)
+	 */
+	@Value("${upbit.websocket.environment:development}")
+	private String marketEnvironment;
+
+	@Autowired
+	private Environment env;
+
+	/**
+	 * WebSocket 연결 상태를 관리하는 Disposable 객체.
+	 * 애플리케이션 종료 시 연결을 정리하는 데 사용된다.
+	 */
+	private Disposable connectionDisposable;
+
+	/**
+	 * Spring 애플리케이션이 완전히 준비된 후 WebSocket 연결을 시작한다.
+	 *
+	 * <p>ApplicationReadyEvent를 사용하여 모든 빈의 초기화가 완료되고
+	 * 애플리케이션이 요청을 받을 준비가 된 시점에 연결을 시작한다.
+	 *
+	 * @param event Spring 애플리케이션 준비 완료 이벤트
+	 */
+	@EventListener(ApplicationReadyEvent.class)
+	public void startWebSocketConnection(ApplicationReadyEvent event) {
+		List<String> marketCodes = loadMarketCodes();
+		log.info("애플리케이션 준비 완료, {} 환경으로 {} 개 마켓코드 WebSocket 연결을 시작합니다.",
+			marketEnvironment, marketCodes.size());
+		log.debug("구독할 마켓코드: {}", marketCodes);
+		connectToUpbit();
+	}
+
+	/**
+	 * Spring이 YAML List를 indexed property로 변환하므로
+	 * Environment를 통해 동적으로 마켓코드를 로드한다.
+	 *
+	 * @return 구독할 마켓코드 목록
+	 */
+	private List<String> loadMarketCodes() {
+		List<String> marketCodes = new ArrayList<>();
+		List<String> enabledTiers = getEnabledTiers();
+
+		for (String tier : enabledTiers) {
+			List<String> tierMarkets = loadTierMarkets(tier);
+			if (!tierMarkets.isEmpty()) {
+				marketCodes.addAll(tierMarkets);
+				log.debug("티어 '{}' 마켓코드 {} 개 추가: {}", tier, tierMarkets.size(), tierMarkets);
+			}
+		}
+
+		if (marketCodes.isEmpty()) {
+			marketCodes = getDefaultMarketCodes();
+			log.warn("설정에서 마켓코드를 로드할 수 없어 기본값 사용: {}", marketCodes);
+		}
+
+		return marketCodes;
+	}
+
+	/**
+	 * Environment를 통해 특정 티어의 마켓코드를 동적으로 로드한다.
+	 *
+	 * @param tier 로드할 티어 (tier1, tier2, tier3)
+	 * @return 해당 티어의 마켓코드 목록
+	 */
+	private List<String> loadTierMarkets(String tier) {
+		List<String> markets = new ArrayList<>();
+		int index = 0;
+
+		while (true) {
+			String propertyKey = String.format("markets.krw.%s[%d]", tier, index);
+			String market = env.getProperty(propertyKey);
+
+			if (market == null) {
+				break;
+			}
+
+			markets.add(market);
+			index++;
+		}
+
+		log.debug("티어 '{}' 로드 완료: {} 개 마켓코드", tier, markets.size());
+		return markets;
+	}
+
+	/**
+	 * Environment를 통해 환경별 티어 목록을 동적으로 로드한다.
+	 *
+	 * @return 활성화된 티어 목록
+	 */
+	private List<String> getEnabledTiers() {
+		String environment = marketEnvironment.toLowerCase();
+		List<String> tiers = new ArrayList<>();
+		int index = 0;
+
+		while (true) {
+			String propertyKey = String.format("env.%s[%d]", environment, index);
+			String tier = env.getProperty(propertyKey);
+
+			if (tier == null) {
+				break;
+			}
+
+			tiers.add(tier);
+			index++;
+		}
+
+		if (tiers.isEmpty()) {
+			tiers = List.of("tier1");
+			log.debug("환경 '{}' 설정이 없어 기본값 사용: {}", environment, tiers);
+		}
+
+		log.debug("환경 '{}' 활성 티어: {}", environment, tiers);
+		return tiers;
+	}
+
+	/**
+	 * Upbit WebSocket 서버에 연결하고 데이터 스트리밍을 시작한다.
+	 *
+	 * <p>연결 실패 시 지수 백오프 방식으로 자동 재연결을 시도한다.
+	 * 최대 백오프 시간은 1분으로 제한된다.
+	 */
+	private void connectToUpbit() {
+		this.connectionDisposable = webSocketClient
+			.execute(UPBIT_WEBSOCKET_URI, this::handleWebSocketSession)
+			.retryWhen(Retry.backoff(Long.MAX_VALUE, Duration.ofSeconds(5))
+				.maxBackoff(Duration.ofMinutes(1))
+				.doBeforeRetry(retrySignal ->
+					log.warn("Upbit WebSocket 연결 재시도 중... (시도 횟수: {})",
+						retrySignal.totalRetries() + 1)))
+			.subscribe(
+				null,
+				error -> log.error("Upbit WebSocket 연결에 복구 불가능한 오류 발생", error),
+				() -> log.info("Upbit WebSocket 연결이 정상적으로 종료되었습니다.")
+			);
+	}
+
+	/**
+	 * WebSocket 세션을 처리한다.
+	 * 구독 메시지 전송, Ping/Pong 메커니즘, 데이터 수신을 담당한다.
+	 *
+	 * @param session WebSocket 세션
+	 * @return 세션 처리 완료를 나타내는 Mono
+	 */
+	private Mono<Void> handleWebSocketSession(WebSocketSession session) {
+		log.info("Upbit WebSocket 연결 성공, 데이터 구독을 시작합니다.");
+
+		// 구독 메시지 전송
+		Mono<Void> sendSubscription = sendSubscriptionMessage(session);
+
+		// 60초 주기 Ping 메시지 전송
+		Mono<Void> keepAlive = sendPeriodicPing(session);
+
+		// 메시지 수신 및 처리
+		Mono<Void> receiveMessages = receiveAndProcessMessages(session);
+
+		// 모든 작업을 병렬로 실행
+		return Mono.when(sendSubscription, keepAlive, receiveMessages);
+	}
+
+	/**
+	 * Upbit WebSocket에 ticker 데이터 구독 메시지를 전송한다.
+	 *
+	 * @param session WebSocket 세션
+	 * @return 메시지 전송 완료를 나타내는 Mono
+	 */
+	private Mono<Void> sendSubscriptionMessage(WebSocketSession session) {
+		try {
+			String subscriptionMessage = createSubscriptionMessage();
+			log.debug("구독 메시지 전송: {}", subscriptionMessage);
+
+			return session.send(Mono.just(session.textMessage(subscriptionMessage)));
+		} catch (Exception e) {
+			return Mono.error(new RuntimeException("구독 메시지 생성 실패", e));
+		}
+	}
+
+	/**
+	 * 60초 주기로 Ping 메시지를 전송하여 연결을 유지한다.
+	 *
+	 * <p>Upbit API 권장사항에 따라 60초 주기로 Ping을 전송한다.
+	 *
+	 * @param session WebSocket 세션
+	 * @return Ping 전송 완료를 나타내는 Mono
+	 */
+	private Mono<Void> sendPeriodicPing(WebSocketSession session) {
+		return Flux.interval(PING_INTERVAL)
+			.doOnNext(tick -> log.trace("Ping 메시지 전송 (tick: {})", tick))
+			.flatMap(tick -> {
+				WebSocketMessage pingMessage = session.pingMessage(factory ->
+					factory.wrap("ping".getBytes()));
+				return session.send(Mono.just(pingMessage));
+			})
+			.onErrorContinue((error, obj) ->
+				log.warn("Ping 전송 실패, 연결 상태를 확인하세요: {}", error.getMessage()))
+			.then();
+	}
+
+	/**
+	 * WebSocket으로부터 메시지를 수신하고 처리한다.
+	 *
+	 * @param session WebSocket 세션
+	 * @return 메시지 수신 완료를 나타내는 Mono
+	 */
+	private Mono<Void> receiveAndProcessMessages(WebSocketSession session) {
+		return session.receive()
+			.map(WebSocketMessage::getPayloadAsText)
+			.flatMap(this::parseTickerData)
+			.doOnNext(this::processTickerData)
+			.doOnError(error -> log.error("메시지 처리 중 오류 발생", error))
+			.onErrorContinue((error, obj) ->
+				log.warn("메시지 처리 실패, 다음 메시지 계속 처리: {}", error.getMessage()))
+			.then();
+	}
+
+	/**
+	 * 수신된 Ticker 데이터를 처리한다.
+	 *
+	 * <p>Upbit DTO를 표준 DTO로 변환하고 서비스 계층으로 전달한다.
+	 * 각 데이터 타입별로 명시적인 변환 메서드를 호출한다.
+	 *
+	 * @param upbitDto 수신된 Upbit ticker DTO
+	 */
+	private void processTickerData(UpbitTickerDto upbitDto) {
+		try {
+			log.trace("Ticker 데이터 수신: {} - {}",
+				upbitDto.getMarketCode(), upbitDto.getTradePrice());
+
+			MarketDataMessage message = upbitDataConverter.convertTickerData(upbitDto);
+
+			marketDataService.processMarketData(message);
+
+		} catch (IllegalArgumentException e) {
+			log.warn("Ticker 데이터 검증 실패: {} - {}",
+				upbitDto.getMarketCode(), e.getMessage());
+		} catch (Exception e) {
+			log.error("Ticker 데이터 처리 실패: {}", upbitDto.getMarketCode(), e);
+		}
+	}
+
+	/**
+	 * Upbit WebSocket 구독 요청 메시지를 JSON 형식으로 생성한다.
+	 *
+	 * <p>Upbit API 명세에 따라 ticket, type, format 정보를 포함한
+	 * JSON 배열 형태의 메시지를 생성한다.
+	 *
+	 * <p>마켓코드는 설정 파일에서 로드한 목록을 사용한다.
+	 *
+	 * @return JSON 형식의 구독 메시지
+	 * @throws JsonProcessingException JSON 직렬화 실패 시
+	 */
+	private String createSubscriptionMessage() throws JsonProcessingException {
+		List<String> marketCodes = loadMarketCodes();
+
+		List<Object> request = List.of(
+			new Ticket(UUID.randomUUID().toString()),
+			new Type("ticker", marketCodes),
+			new Format("SIMPLE")
+		);
+
+		return objectMapper.writeValueAsString(request);
+	}
+
+	/**
+	 * 수신된 JSON 메시지를 UpbitTickerDto 객체로 파싱한다.
+	 *
+	 * <p>파싱에 실패한 메시지(연결 성공 메시지 등)는 무시하고
+	 * 빈 Mono를 반환한다.
+	 *
+	 * @param jsonMessage WebSocket으로부터 수신된 JSON 문자열
+	 * @return 파싱된 TickerDto 또는 빈 Mono
+	 */
+	private Mono<UpbitTickerDto> parseTickerData(String jsonMessage) {
+		try {
+			UpbitTickerDto tickerDto = objectMapper.readValue(jsonMessage, UpbitTickerDto.class);
+			return Mono.just(tickerDto);
+		} catch (JsonProcessingException e) {
+			log.trace("Ticker 데이터가 아닌 메시지 수신 (무시): {}",
+				jsonMessage.substring(0, Math.min(100, jsonMessage.length())));
+			return Mono.empty();
+		}
+	}
+
+	/**
+	 * 설정 로드 실패 시 사용할 기본 마켓코드.
+	 *
+	 * @return 기본 마켓코드 목록
+	 */
+	private List<String> getDefaultMarketCodes() {
+		return List.of("KRW-BTC", "KRW-ETH", "KRW-XRP");
+	}
+
+	/**
+	 * 애플리케이션 종료 시 WebSocket 연결을 정리한다.
+	 *
+	 * <p>DisposableBean 인터페이스 구현을 통해 Spring 컨테이너 종료 시
+	 * 자동으로 호출되어 리소스를 정리한다.
+	 */
+	@Override
+	public void destroy() {
+		if (connectionDisposable != null && !connectionDisposable.isDisposed()) {
+			log.info("Upbit WebSocket 연결을 종료합니다.");
+			connectionDisposable.dispose();
+		}
+	}
+
+	// 구독 메시지 포맷을 위한 내부 레코드 클래스들
+	private record Ticket(String ticket) {
+	}
+
+	private record Type(String type, List<String> codes) {
+	}
+
+	private record Format(String format) {
+	}
+}
