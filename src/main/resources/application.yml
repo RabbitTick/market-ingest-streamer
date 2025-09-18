@@ -4,6 +4,8 @@ server:
 spring:
   application:
     name: market-ingest-streamer
+  config:
+    import: classpath:upbit-markets.yml
 
   rabbitmq:
     host: localhost
@@ -14,3 +16,16 @@ spring:
 upbit:
   websocket:
     uri: wss://api.upbit.com/websocket/v1
+    environment: development
+
+rabbitmq:
+  exchange:
+    market-data: market-data.exchange
+
+test:
+  consumer:
+    enabled: true
+
+logging:
+  level:
+    com.rabbittick.streamer: debug
