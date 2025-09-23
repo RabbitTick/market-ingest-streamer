@@ -5,6 +5,11 @@ import java.math.BigDecimal;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Positive;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -33,6 +38,8 @@ public class UpbitTickerDto {
 	 * <p>Upbit API 필드: cd (code)
 	 */
 	@JsonProperty("cd")
+	@NotBlank(message = "마켓 코드는 필수값입니다")
+	@Pattern(regexp = "^[A-Z]{3,4}-[A-Z0-9]{2,10}$", message = "마켓 코드 형식이 올바르지 않습니다 (예: KRW-BTC)")
 	private String marketCode;
 
 	/**
@@ -41,6 +48,8 @@ public class UpbitTickerDto {
 	 * <p>Upbit API 필드: tp (trade_price)
 	 */
 	@JsonProperty("tp")
+	@NotNull(message = "현재가는 필수값입니다")
+	@DecimalMin(value = "0.0", inclusive = false, message = "현재가는 0보다 커야 합니다")
 	private BigDecimal tradePrice;
 
 	/**
@@ -49,6 +58,7 @@ public class UpbitTickerDto {
 	 * <p>Upbit API 필드: tv (trade_volume)
 	 */
 	@JsonProperty("tv")
+	@DecimalMin(value = "0.0", message = "거래량은 0 이상이어야 합니다")
 	private BigDecimal tradeVolume;
 
 	/**
@@ -57,6 +67,7 @@ public class UpbitTickerDto {
 	 * <p>Upbit API 필드: op (opening_price)
 	 */
 	@JsonProperty("op")
+	@DecimalMin(value = "0.0", inclusive = false, message = "시가는 0보다 커야 합니다")
 	private BigDecimal openingPrice;
 
 	/**
@@ -65,6 +76,7 @@ public class UpbitTickerDto {
 	 * <p>Upbit API 필드: hp (high_price)
 	 */
 	@JsonProperty("hp")
+	@DecimalMin(value = "0.0", inclusive = false, message = "고가는 0보다 커야 합니다")
 	private BigDecimal highPrice;
 
 	/**
@@ -73,6 +85,7 @@ public class UpbitTickerDto {
 	 * <p>Upbit API 필드: lp (low_price)
 	 */
 	@JsonProperty("lp")
+	@DecimalMin(value = "0.0", inclusive = false, message = "저가는 0보다 커야 합니다")
 	private BigDecimal lowPrice;
 
 	/**
@@ -81,6 +94,7 @@ public class UpbitTickerDto {
 	 * <p>Upbit API 필드: pcp (prev_closing_price)
 	 */
 	@JsonProperty("pcp")
+	@DecimalMin(value = "0.0", inclusive = false, message = "전일 종가는 0보다 커야 합니다")
 	private BigDecimal prevClosingPrice;
 
 	/**
@@ -89,6 +103,7 @@ public class UpbitTickerDto {
 	 * <p>Upbit API 필드: atp24h (acc_trade_price_24h)
 	 */
 	@JsonProperty("atp24h")
+	@DecimalMin(value = "0.0", message = "24시간 누적 거래대금은 0 이상이어야 합니다")
 	private BigDecimal accTradePrice24h;
 
 	/**
@@ -97,6 +112,7 @@ public class UpbitTickerDto {
 	 * <p>Upbit API 필드: atv24h (acc_trade_volume_24h)
 	 */
 	@JsonProperty("atv24h")
+	@DecimalMin(value = "0.0", message = "24시간 누적 거래량은 0 이상이어야 합니다")
 	private BigDecimal accTradeVolume24h;
 
 	/**
@@ -105,5 +121,6 @@ public class UpbitTickerDto {
 	 * <p>Upbit API 필드: tms (timestamp)
 	 */
 	@JsonProperty("tms")
+	@Positive(message = "타임스탬프는 양수여야 합니다")
 	private long timestamp;
 }
