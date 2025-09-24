@@ -1,0 +1,44 @@
+markets:
+  krw:
+    # Tier 1: 메이저 코인 (거래량 최상위)
+    tier1:
+      - KRW-BTC      # 비트코인
+      - KRW-ETH      # 이더리움
+      - KRW-XRP      # 리플
+      - KRW-ADA      # 카르다노
+      - KRW-DOT      # 폴카닷
+
+    # Tier 2: 안정적인 알트코인
+    tier2:
+      - KRW-BCH      # 비트코인캐시
+      - KRW-ETC      # 이더리움클래식
+      - KRW-LTC      # 라이트코인
+      - KRW-XLM      # 스텔라루멘
+      - KRW-VET      # 비체인
+      - KRW-TRX      # 트론
+      - KRW-EOS      # 이오스
+      - KRW-ATOM     # 코스모스
+      - KRW-LINK     # 체인링크
+      - KRW-MATIC    # 폴리곤
+
+    # Tier 3: 한국에서 인기있는 코인
+    tier3:
+      - KRW-ICX      # 아이콘
+      - KRW-KLAY     # 클레이튼
+      - KRW-ENJ      # 엔진코인
+      - KRW-CHZ      # 칠리즈
+      - KRW-DOGE     # 도지코인
+
+# 환경별 사용할 티어 설정
+env:
+  development:
+    - tier1                    # 개발환경: tier1만 사용 (5개)
+
+  production:
+    - tier1
+    - tier2                    # 운영환경: tier1, tier2 사용 (15개)
+
+  full:
+    - tier1
+    - tier2
+    - tier3                    # 전체 환경: 모든 티어 사용 (20개)
