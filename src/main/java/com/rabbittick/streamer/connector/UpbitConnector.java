@@ -18,8 +18,10 @@ import org.springframework.web.reactive.socket.WebSocketSession;
 import org.springframework.web.reactive.socket.client.WebSocketClient;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbittick.streamer.connector.dto.upbit.UpbitTickerDto;
+import com.rabbittick.streamer.connector.dto.upbit.UpbitTradeDto;
 import com.rabbittick.streamer.converter.UpbitDataConverter;
 import com.rabbittick.streamer.global.dto.MarketDataMessage;
 import com.rabbittick.streamer.service.MarketDataService;
@@ -37,7 +39,7 @@ import reactor.util.retry.Retry;
  * <p>주요 책임:
  * <ul>
  *   <li>Upbit WebSocket 연결 생명주기 관리</li>
- *   <li>실시간 ticker 데이터 수신 및 파싱</li>
+ *   <li>실시간 ticker 및 trade 데이터 수신 및 파싱</li>
  *   <li>연결 실패 시 자동 재연결</li>
  *   <li>60초 주기 Ping/Pong 메커니즘으로 연결 유지</li>
  * </ul>
@@ -64,6 +66,18 @@ public class UpbitConnector implements DisposableBean {
 	@Value("${upbit.websocket.environment:development}")
 	private String marketEnvironment;
 
+    /**
+     * Ticker 데이터 수집 활성화 여부
+     */
+    @Value("${upbit.websocket.data-types.ticker.enabled:true}")
+    private boolean tickerEnabled;
+
+    /**
+     * Trade 데이터 수집 활성화 여부
+     */
+    @Value("${upbit.websocket.data-types.trade.enabled:false}")
+    private boolean tradeEnabled;
+
 	@Autowired
 	private Environment env;
 
@@ -73,22 +87,24 @@ public class UpbitConnector implements DisposableBean {
 	 */
 	private Disposable connectionDisposable;
 
-	/**
-	 * Spring 애플리케이션이 완전히 준비된 후 WebSocket 연결을 시작한다.
-	 *
-	 * <p>ApplicationReadyEvent를 사용하여 모든 빈의 초기화가 완료되고
-	 * 애플리케이션이 요청을 받을 준비가 된 시점에 연결을 시작한다.
-	 *
-	 * @param event Spring 애플리케이션 준비 완료 이벤트
-	 */
-	@EventListener(ApplicationReadyEvent.class)
-	public void startWebSocketConnection(ApplicationReadyEvent event) {
-		List<String> marketCodes = loadMarketCodes();
-		log.info("애플리케이션 준비 완료, {} 환경으로 {} 개 마켓코드 WebSocket 연결을 시작합니다.",
-			marketEnvironment, marketCodes.size());
-		log.debug("구독할 마켓코드: {}", marketCodes);
-		connectToUpbit();
-	}
+    /**
+     * Spring 애플리케이션이 완전히 준비된 후 WebSocket 연결을 시작한다.
+     *
+     * <p>ApplicationReadyEvent를 사용하여 모든 빈의 초기화가 완료되고
+     * 애플리케이션이 요청을 받을 준비가 된 시점에 연결을 시작한다.
+     *
+     * @param event Spring 애플리케이션 준비 완료 이벤트
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    public void startWebSocketConnection(ApplicationReadyEvent event) {
+        log.debug("설정 로드 확인 - tickerEnabled: {}, tradeEnabled: {}", tickerEnabled, tradeEnabled);
+        List<String> marketCodes = loadMarketCodes();
+        log.info("애플리케이션 준비 완료, {} 환경으로 {} 개 마켓코드 WebSocket 연결을 시작합니다.",
+                marketEnvironment, marketCodes.size());
+        log.info("활성화된 데이터 타입 - Ticker: {}, Trade: {}", tickerEnabled, tradeEnabled);
+        log.debug("구독할 마켓코드: {}", marketCodes);
+        connectToUpbit();
+    }
 
 	/**
 	 * Spring이 YAML List를 indexed property로 변환하므로
@@ -218,7 +234,7 @@ public class UpbitConnector implements DisposableBean {
 	}
 
 	/**
-	 * Upbit WebSocket에 ticker 데이터 구독 메시지를 전송한다.
+	 * Upbit WebSocket에 데이터 구독 메시지를 전송한다.
 	 *
 	 * @param session WebSocket 세션
 	 * @return 메시지 전송 완료를 나타내는 Mono
@@ -255,22 +271,111 @@ public class UpbitConnector implements DisposableBean {
 			.then();
 	}
 
-	/**
-	 * WebSocket으로부터 메시지를 수신하고 처리한다.
-	 *
-	 * @param session WebSocket 세션
-	 * @return 메시지 수신 완료를 나타내는 Mono
-	 */
-	private Mono<Void> receiveAndProcessMessages(WebSocketSession session) {
-		return session.receive()
-			.map(WebSocketMessage::getPayloadAsText)
-			.flatMap(this::parseTickerData)
-			.doOnNext(this::processTickerData)
-			.doOnError(error -> log.error("메시지 처리 중 오류 발생", error))
-			.onErrorContinue((error, obj) ->
-				log.warn("메시지 처리 실패, 다음 메시지 계속 처리: {}", error.getMessage()))
-			.then();
-	}
+    /**
+     * WebSocket으로부터 메시지를 수신하고 처리한다.
+     *
+     * @param session WebSocket 세션
+     * @return 메시지 수신 완료를 나타내는 Mono
+     */
+    private Mono<Void> receiveAndProcessMessages(WebSocketSession session) {
+        return session.receive()
+                .map(WebSocketMessage::getPayloadAsText)
+                .flatMap(this::parseMessage)
+                .doOnError(error -> log.error("메시지 처리 중 오류 발생", error))
+                .onErrorContinue((error, obj) ->
+                        log.warn("메시지 처리 실패, 다음 메시지 계속 처리: {}", error.getMessage()))
+                .then();
+    }
+
+    /**
+     * WebSocket으로부터 수신된 메시지를 타입에 따라 파싱한다.
+     *
+     * @param jsonMessage WebSocket으로부터 수신된 JSON 문자열
+     * @return 파싱된 메시지를 담는 Mono (타입별 분기 처리)
+     */
+    private Mono<Void> parseMessage(String jsonMessage) {
+        log.debug("WebSocket 메시지 수신: {}", jsonMessage);
+
+        try {
+            // 먼저 메시지에서 type 필드를 확인
+            JsonNode messageNode = objectMapper.readTree(jsonMessage);
+            JsonNode typeNode = messageNode.get("ty");
+
+            if (typeNode == null) {
+                log.trace("type 필드가 없는 메시지 무시");
+                return Mono.empty();
+            }
+
+            String messageType = typeNode.asText();
+            log.debug("메시지 타입 확인: {}", messageType);
+
+            switch (messageType) {
+                case "ticker":
+                    if (tickerEnabled) {
+                        return parseTickerData(jsonMessage)
+                                .doOnNext(this::processTickerData)
+                                .then();
+                    }
+                    break;
+
+                case "trade":
+                    if (tradeEnabled) {
+                        return parseTradeData(jsonMessage)
+                                .doOnNext(this::processTradeData)
+                                .then();
+                    }
+                    break;
+
+                default:
+                    log.trace("알 수 없는 메시지 타입 무시: {}", messageType);
+                    break;
+            }
+
+            return Mono.empty();
+
+        } catch (JsonProcessingException e) {
+            log.trace("메시지 파싱 실패 (무시): {}",
+                    jsonMessage.substring(0, Math.min(100, jsonMessage.length())));
+            return Mono.empty();
+        }
+    }
+
+    /**
+     * 수신된 JSON 메시지를 UpbitTickerDto 객체로 파싱한다.
+     *
+     * <p>파싱에 실패한 메시지(연결 성공 메시지 등)는 무시하고
+     * 빈 Mono를 반환한다.
+     *
+     * @param jsonMessage WebSocket으로부터 수신된 JSON 문자열
+     * @return 파싱된 TickerDto 또는 빈 Mono
+     */
+    private Mono<UpbitTickerDto> parseTickerData(String jsonMessage) {
+        try {
+            UpbitTickerDto tickerDto = objectMapper.readValue(jsonMessage, UpbitTickerDto.class);
+            return Mono.just(tickerDto);
+        } catch (JsonProcessingException e) {
+            log.trace("Ticker 데이터가 아닌 메시지 수신 (무시): {}",
+                    jsonMessage.substring(0, Math.min(100, jsonMessage.length())));
+            return Mono.empty();
+        }
+    }
+
+    /**
+     * 수신된 JSON 메시지를 UpbitTradeDto 객체로 파싱한다.
+     *
+     * @param jsonMessage WebSocket으로부터 수신된 JSON 문자열
+     * @return 파싱된 TradeDto 또는 빈 Mono
+     */
+    private Mono<UpbitTradeDto> parseTradeData(String jsonMessage) {
+        try {
+            UpbitTradeDto tradeDto = objectMapper.readValue(jsonMessage, UpbitTradeDto.class);
+            return Mono.just(tradeDto);
+        } catch (JsonProcessingException e) {
+            log.trace("Trade 데이터가 아닌 메시지 수신 (무시): {}",
+                    jsonMessage.substring(0, Math.min(100, jsonMessage.length())));
+            return Mono.empty();
+        }
+    }
 
 	/**
 	 * 수신된 Ticker 데이터를 처리한다.
@@ -297,47 +402,68 @@ public class UpbitConnector implements DisposableBean {
 		}
 	}
 
-	/**
-	 * Upbit WebSocket 구독 요청 메시지를 JSON 형식으로 생성한다.
-	 *
-	 * <p>Upbit API 명세에 따라 ticket, type, format 정보를 포함한
-	 * JSON 배열 형태의 메시지를 생성한다.
-	 *
-	 * <p>마켓코드는 설정 파일에서 로드한 목록을 사용한다.
-	 *
-	 * @return JSON 형식의 구독 메시지
-	 * @throws JsonProcessingException JSON 직렬화 실패 시
-	 */
-	private String createSubscriptionMessage() throws JsonProcessingException {
-		List<String> marketCodes = loadMarketCodes();
+    /**
+     * 수신된 Trade 데이터를 처리한다.
+     *
+     * @param upbitDto 수신된 Upbit trade DTO
+     */
+    private void processTradeData(UpbitTradeDto upbitDto) {
+        try {
+            log.trace("Trade 데이터 수신: {} - {} ({})",
+                    upbitDto.getMarketCode(), upbitDto.getTradePrice(), upbitDto.getAskBid());
 
-		List<Object> request = List.of(
-			new Ticket(UUID.randomUUID().toString()),
-			new Type("ticker", marketCodes),
-			new Format("SIMPLE")
-		);
+            MarketDataMessage message = upbitDataConverter.convertTradeData(upbitDto);
+
+            marketDataService.processMarketData(message);
+
+        } catch (IllegalArgumentException e) {
+            log.warn("Trade 데이터 검증 실패: {} - {}",
+                    upbitDto.getMarketCode(), e.getMessage());
+        } catch (Exception e) {
+            log.error("Trade 데이터 처리 실패: {}", upbitDto.getMarketCode(), e);
+        }
+    }
+
+    /**
+     * Upbit WebSocket 구독 요청 메시지를 JSON 형식으로 생성한다.
+     *
+     * <p>설정에 따라 활성화된 데이터 타입만 구독한다:
+     * <ul>
+     *   <li>ticker: 현재가 정보</li>
+     *   <li>trade: 거래 체결 정보</li>
+     * </ul>
+     *
+     * @return JSON 형식의 구독 메시지
+     * @throws JsonProcessingException JSON 직렬화 실패 시
+     * @throws IllegalStateException 활성화된 데이터 타입이 없는 경우
+     */
+    private String createSubscriptionMessage() throws JsonProcessingException {
+        List<String> marketCodes = loadMarketCodes();
+        List<Object> request = new ArrayList<>();
+
+        // Ticket 정보
+        request.add(new Ticket(UUID.randomUUID().toString()));
+
+        // 활성화된 데이터 타입별로 구독 요청 추가
+        if (tickerEnabled) {
+            request.add(new Type("ticker", marketCodes));
+            log.info("Ticker 구독 활성화: {} 개 마켓코드", marketCodes.size());
+        }
+
+        if (tradeEnabled) {
+            request.add(new Type("trade", marketCodes));
+            log.info("Trade 구독 활성화: {} 개 마켓코드", marketCodes.size());
+        }
+
+        // 구독할 데이터 타입이 없는 경우 예외 발생
+        if (!tickerEnabled && !tradeEnabled) {
+            throw new IllegalStateException("최소 하나의 데이터 타입은 활성화되어야 합니다");
+        }
+
+        // Format 정보
+        request.add(new Format("SIMPLE"));
 
 		return objectMapper.writeValueAsString(request);
-	}
-
-	/**
-	 * 수신된 JSON 메시지를 UpbitTickerDto 객체로 파싱한다.
-	 *
-	 * <p>파싱에 실패한 메시지(연결 성공 메시지 등)는 무시하고
-	 * 빈 Mono를 반환한다.
-	 *
-	 * @param jsonMessage WebSocket으로부터 수신된 JSON 문자열
-	 * @return 파싱된 TickerDto 또는 빈 Mono
-	 */
-	private Mono<UpbitTickerDto> parseTickerData(String jsonMessage) {
-		try {
-			UpbitTickerDto tickerDto = objectMapper.readValue(jsonMessage, UpbitTickerDto.class);
-			return Mono.just(tickerDto);
-		} catch (JsonProcessingException e) {
-			log.trace("Ticker 데이터가 아닌 메시지 수신 (무시): {}",
-				jsonMessage.substring(0, Math.min(100, jsonMessage.length())));
-			return Mono.empty();
-		}
 	}
 
 	/**

@@ -13,6 +13,8 @@ import org.springframework.stereotype.Component;
 
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.List;
+
 /**
  * RabbitMQ 메시지 수신을 테스트하기 위한 임시 Consumer.
  *
@@ -78,22 +80,32 @@ public class TestConsumer {
 			return QueueBuilder.durable("test.market.data.queue").build();
 		}
 
-		/**
-		 * 테스트 큐와 마켓 데이터 Exchange 간의 바인딩을 설정한다.
-		 *
-		 * <p>라우팅 키 패턴 "*.ticker.*"을 사용하여
-		 * 모든 거래소의 ticker 메시지를 수신할 수 있도록 한다.
-		 * (예: upbit.ticker.KRW-BTC, binance.ticker.BTCUSDT 등)
-		 *
-		 * @param testMarketDataQueue 테스트용 큐
-		 * @param marketDataExchange 마켓 데이터 Exchange
-		 * @return 설정된 바인딩
-		 */
-		@Bean
-		public Binding testMarketDataBinding(Queue testMarketDataQueue, TopicExchange marketDataExchange) {
-			return BindingBuilder.bind(testMarketDataQueue)
-				.to(marketDataExchange)
-				.with("*.ticker.*");
-		}
+        /**
+         * 테스트 큐와 마켓 데이터 Exchange 간의 바인딩을 설정한다.
+         *
+         * <p>라우팅 키 패턴:
+         * <ul>
+         *   <li>"*.ticker.*" - 모든 거래소의 ticker 메시지</li>
+         *   <li>"*.trade.*" - 모든 거래소의 trade 메시지</li>
+         * </ul>
+         *
+         * @param testMarketDataQueue 테스트용 큐
+         * @param marketDataExchange 마켓 데이터 Exchange
+         * @return 설정된 바인딩 목록
+         */
+        @Bean
+        public List<Binding> testMarketDataBindings(Queue testMarketDataQueue, TopicExchange marketDataExchange) {
+            return List.of(
+                    // ticker 바인딩
+                    BindingBuilder.bind(testMarketDataQueue)
+                            .to(marketDataExchange)
+                            .with("*.ticker.*"),
+
+                    // trade 바인딩
+                    BindingBuilder.bind(testMarketDataQueue)
+                            .to(marketDataExchange)
+                            .with("*.trade.*")
+            );
+        }
 	}
 }
