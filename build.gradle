@@ -10,7 +10,7 @@ description = 'Collects real-time market data via WebSocket and publishes it to 
 
 java {
 	toolchain {
-		languageVersion = JavaLanguageVersion.of(17)
+		languageVersion = JavaLanguageVersion.of(21)
 	}
 }
 
