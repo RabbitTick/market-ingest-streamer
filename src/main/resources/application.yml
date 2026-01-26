@@ -17,6 +17,11 @@ upbit:
   websocket:
     uri: wss://api.upbit.com/websocket/v1
     environment: development
+    data-types:
+      ticker:
+        enabled: true
+      trade:
+        enabled: true
 
 rabbitmq:
   exchange:

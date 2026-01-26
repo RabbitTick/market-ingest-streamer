@@ -7,7 +7,8 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbittick.streamer.global.dto.MarketDataMessage;
-
+import com.rabbittick.streamer.global.dto.TickerPayload;
+import com.rabbittick.streamer.global.dto.TradePayload;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -49,19 +50,16 @@ public class MarketDataPublisher {
 
 			rabbitTemplate.convertAndSend(exchangeName, routingKey, jsonMessage);
 
-			log.debug("메시지 발행 성공 - Routing Key: {}, Message ID: {}",
-				routingKey, message.getMetadata().getMessageId());
+            log.debug("메시지 발행 성공 - Routing Key: {}, Message ID: {}", routingKey, message.getMetadata().getMessageId());
 
-		} catch (JsonProcessingException e) {
-			log.error("JSON 직렬화 실패 - Message ID: {}",
-				message.getMetadata().getMessageId(), e);
-			throw new MessagePublishException("메시지 직렬화 실패", e);
-		} catch (Exception e) {
-			log.error("메시지 발행 실패 - Message ID: {}",
-				message.getMetadata().getMessageId(), e);
-			throw new MessagePublishException("메시지 발행 실패", e);
-		}
-	}
+        } catch (JsonProcessingException e) {
+            log.error("JSON 직렬화 실패 - Message ID: {}", message.getMetadata().getMessageId(), e);
+            throw new MessagePublishException("메시지 직렬화 실패", e);
+        } catch (Exception e) {
+            log.error("메시지 발행 실패 - Message ID: {}", message.getMetadata().getMessageId(), e);
+            throw new MessagePublishException("메시지 발행 실패", e);
+        }
+    }
 
 	/**
 	 * 메시지 메타데이터를 기반으로 라우팅 키를 생성한다.
@@ -80,32 +78,30 @@ public class MarketDataPublisher {
 		return String.format("%s.%s.%s", exchange, dataType, marketCode);
 	}
 
-	/**
-	 * 메시지 페이로드에서 마켓 코드를 추출한다.
-	 *
-	 * @param message 마켓 코드를 추출할 메시지
-	 * @return 추출된 마켓 코드
-	 */
-	private String extractMarketCode(MarketDataMessage message) {
-		// TickerPayload에서 marketCode 추출
-		// 추후 다른 데이터 타입 추가 시 instanceof로 분기
-		if (message.getPayload() instanceof com.rabbittick.streamer.global.dto.TickerPayload) {
-			com.rabbittick.streamer.global.dto.TickerPayload ticker =
-				(com.rabbittick.streamer.global.dto.TickerPayload)message.getPayload();
-			return ticker.getMarketCode();
-		}
+    /**
+     * 메시지 페이로드에서 마켓 코드를 추출한다.
+     *
+     * @param message 마켓 코드를 추출할 메시지
+     * @return 추출된 마켓 코드
+     * @throws IllegalArgumentException 지원하지 않는 payload 타입인 경우
+     */
+    private String extractMarketCode(MarketDataMessage message) {
+        Object payload = message.getPayload();
 
-		throw new IllegalArgumentException("지원하지 않는 payload 타입: " +
-			message.getPayload().getClass().getSimpleName());
-	}
+        if (payload instanceof TickerPayload) {
+            return ((TickerPayload) payload).getMarketCode();
+        }
+
+        if (payload instanceof TradePayload) {
+            return ((TradePayload) payload).getMarketCode();
+        }
+        throw new IllegalArgumentException("지원하지 않는 payload 타입: " + message.getPayload().getClass().getSimpleName());
+    }
 
 	/**
 	 * 메시지 발행 관련 예외를 나타내는 커스텀 예외.
 	 */
 	public static class MessagePublishException extends RuntimeException {
-		public MessagePublishException(String message) {
-			super(message);
-		}
 
 		public MessagePublishException(String message, Throwable cause) {
 			super(message, cause);
