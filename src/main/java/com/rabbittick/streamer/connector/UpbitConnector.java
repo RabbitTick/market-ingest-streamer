@@ -20,6 +20,7 @@ import org.springframework.web.reactive.socket.client.WebSocketClient;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rabbittick.streamer.connector.dto.upbit.UpbitOrderBookDto;
 import com.rabbittick.streamer.connector.dto.upbit.UpbitTickerDto;
 import com.rabbittick.streamer.connector.dto.upbit.UpbitTradeDto;
 import com.rabbittick.streamer.converter.UpbitDataConverter;
@@ -78,6 +79,12 @@ public class UpbitConnector implements DisposableBean {
     @Value("${upbit.websocket.data-types.trade.enabled:false}")
     private boolean tradeEnabled;
 
+    /**
+     * OrderBook 데이터 수집 활성화 여부
+     */
+    @Value("${upbit.websocket.data-types.orderbook.enabled:false}")
+    private boolean orderbookEnabled;
+
 	@Autowired
 	private Environment env;
 
@@ -97,11 +104,13 @@ public class UpbitConnector implements DisposableBean {
      */
     @EventListener(ApplicationReadyEvent.class)
     public void startWebSocketConnection(ApplicationReadyEvent event) {
-        log.debug("설정 로드 확인 - tickerEnabled: {}, tradeEnabled: {}", tickerEnabled, tradeEnabled);
+        log.debug("설정 로드 확인 - tickerEnabled: {}, tradeEnabled: {}, orderbookEnabled: {}",
+            tickerEnabled, tradeEnabled, orderbookEnabled);
         List<String> marketCodes = loadMarketCodes();
         log.info("애플리케이션 준비 완료, {} 환경으로 {} 개 마켓코드 WebSocket 연결을 시작합니다.",
                 marketEnvironment, marketCodes.size());
-        log.info("활성화된 데이터 타입 - Ticker: {}, Trade: {}", tickerEnabled, tradeEnabled);
+        log.info("활성화된 데이터 타입 - Ticker: {}, Trade: {}, OrderBook: {}",
+            tickerEnabled, tradeEnabled, orderbookEnabled);
         log.debug("구독할 마켓코드: {}", marketCodes);
         connectToUpbit();
     }
@@ -326,6 +335,14 @@ public class UpbitConnector implements DisposableBean {
                     }
                     break;
 
+                case "orderbook":
+                    if (orderbookEnabled) {
+                        return parseOrderBookData(jsonMessage)
+                                .doOnNext(this::processOrderBookData)
+                                .then();
+                    }
+                    break;
+
                 default:
                     log.trace("알 수 없는 메시지 타입 무시: {}", messageType);
                     break;
@@ -377,6 +394,23 @@ public class UpbitConnector implements DisposableBean {
         }
     }
 
+    /**
+     * 수신된 JSON 메시지를 UpbitOrderBookDto 객체로 파싱한다.
+     *
+     * @param jsonMessage WebSocket으로부터 수신된 JSON 문자열
+     * @return 파싱된 OrderBookDto 또는 빈 Mono
+     */
+    private Mono<UpbitOrderBookDto> parseOrderBookData(String jsonMessage) {
+        try {
+            UpbitOrderBookDto orderBookDto = objectMapper.readValue(jsonMessage, UpbitOrderBookDto.class);
+            return Mono.just(orderBookDto);
+        } catch (JsonProcessingException e) {
+            log.trace("OrderBook 데이터가 아닌 메시지 수신 (무시): {}",
+                    jsonMessage.substring(0, Math.min(100, jsonMessage.length())));
+            return Mono.empty();
+        }
+    }
+
 	/**
 	 * 수신된 Ticker 데이터를 처리한다.
 	 *
@@ -390,7 +424,7 @@ public class UpbitConnector implements DisposableBean {
 			log.trace("Ticker 데이터 수신: {} - {}",
 				upbitDto.getMarketCode(), upbitDto.getTradePrice());
 
-			MarketDataMessage message = upbitDataConverter.convertTickerData(upbitDto);
+			MarketDataMessage<?> message = upbitDataConverter.convertTickerData(upbitDto);
 
 			marketDataService.processMarketData(message);
 
@@ -412,7 +446,7 @@ public class UpbitConnector implements DisposableBean {
             log.trace("Trade 데이터 수신: {} - {} ({})",
                     upbitDto.getMarketCode(), upbitDto.getTradePrice(), upbitDto.getAskBid());
 
-            MarketDataMessage message = upbitDataConverter.convertTradeData(upbitDto);
+            MarketDataMessage<?> message = upbitDataConverter.convertTradeData(upbitDto);
 
             marketDataService.processMarketData(message);
 
@@ -425,12 +459,36 @@ public class UpbitConnector implements DisposableBean {
     }
 
     /**
+     * 수신된 OrderBook 데이터를 처리한다.
+     *
+     * @param upbitDto 수신된 Upbit orderbook DTO
+     */
+    private void processOrderBookData(UpbitOrderBookDto upbitDto) {
+        try {
+            log.trace("OrderBook 데이터 수신: {} - units: {}",
+                upbitDto.getMarketCode(),
+                upbitDto.getOrderbookUnits() == null ? 0 : upbitDto.getOrderbookUnits().size());
+
+            MarketDataMessage<?> message = upbitDataConverter.convertOrderBookData(upbitDto);
+
+            marketDataService.processMarketData(message);
+
+        } catch (IllegalArgumentException e) {
+            log.warn("OrderBook 데이터 검증 실패: {} - {}",
+                upbitDto.getMarketCode(), e.getMessage());
+        } catch (Exception e) {
+            log.error("OrderBook 데이터 처리 실패: {}", upbitDto.getMarketCode(), e);
+        }
+    }
+
+    /**
      * Upbit WebSocket 구독 요청 메시지를 JSON 형식으로 생성한다.
      *
      * <p>설정에 따라 활성화된 데이터 타입만 구독한다:
      * <ul>
      *   <li>ticker: 현재가 정보</li>
      *   <li>trade: 거래 체결 정보</li>
+     *   <li>orderbook: 호가 정보</li>
      * </ul>
      *
      * @return JSON 형식의 구독 메시지
@@ -455,8 +513,13 @@ public class UpbitConnector implements DisposableBean {
             log.info("Trade 구독 활성화: {} 개 마켓코드", marketCodes.size());
         }
 
+        if (orderbookEnabled) {
+            request.add(new Type("orderbook", marketCodes));
+            log.info("OrderBook 구독 활성화: {} 개 마켓코드", marketCodes.size());
+        }
+
         // 구독할 데이터 타입이 없는 경우 예외 발생
-        if (!tickerEnabled && !tradeEnabled) {
+        if (!tickerEnabled && !tradeEnabled && !orderbookEnabled) {
             throw new IllegalStateException("최소 하나의 데이터 타입은 활성화되어야 합니다");
         }
 
