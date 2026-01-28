@@ -1,14 +1,18 @@
 package com.rabbittick.streamer.converter;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.stereotype.Component;
 
+import com.rabbittick.streamer.connector.dto.upbit.UpbitOrderBookDto;
 import com.rabbittick.streamer.connector.dto.upbit.UpbitTickerDto;
 import com.rabbittick.streamer.connector.dto.upbit.UpbitTradeDto;
 import com.rabbittick.streamer.global.dto.MarketDataMessage;
 import com.rabbittick.streamer.global.dto.Metadata;
+import com.rabbittick.streamer.global.dto.OrderBookPayload;
+import com.rabbittick.streamer.global.dto.OrderBookUnitPayload;
 import com.rabbittick.streamer.global.dto.TickerPayload;
 import com.rabbittick.streamer.global.dto.TradePayload;
 
@@ -22,7 +26,7 @@ import com.rabbittick.streamer.global.dto.TradePayload;
  * <ul>
  *   <li>Ticker - 현재가 정보</li>
  *   <li>Trade - 거래 체결 정보</li>
- *   <li>OrderBook - 호가 정보 (향후 추가 예정)</li>
+ *   <li>OrderBook - 호가 정보</li>
  * </ul>
  */
 @Component
@@ -38,7 +42,7 @@ public class UpbitDataConverter {
 	 * @return 표준화된 MarketDataMessage
 	 * @throws IllegalArgumentException 필수 필드가 누락된 경우
 	 */
-	public MarketDataMessage convertTickerData(UpbitTickerDto upbitDto) {
+	public MarketDataMessage<TickerPayload> convertTickerData(UpbitTickerDto upbitDto) {
 		validateTickerInput(upbitDto);
 
 		TickerPayload payload = convertToTickerPayload(upbitDto);
@@ -54,7 +58,7 @@ public class UpbitDataConverter {
      * @return 표준화된 MarketDataMessage
      * @throws IllegalArgumentException 필수 필드가 누락된 경우
      */
-    public MarketDataMessage convertTradeData(UpbitTradeDto upbitDto) {
+    public MarketDataMessage<TradePayload> convertTradeData(UpbitTradeDto upbitDto) {
         validateTradeInput(upbitDto);
 
         TradePayload payload = convertToTradePayload(upbitDto);
@@ -62,6 +66,22 @@ public class UpbitDataConverter {
 
         return createMessage(metadata, payload);
     }
+
+	/**
+	 * UpbitOrderBookDto를 표준 MarketDataMessage로 변환한다.
+	 *
+	 * @param upbitDto Upbit WebSocket에서 수신한 orderbook DTO
+	 * @return 표준화된 MarketDataMessage
+	 * @throws IllegalArgumentException 필수 필드가 누락된 경우
+	 */
+	public MarketDataMessage<OrderBookPayload> convertOrderBookData(UpbitOrderBookDto upbitDto) {
+		validateOrderBookInput(upbitDto);
+
+		OrderBookPayload payload = convertToOrderBookPayload(upbitDto);
+		Metadata metadata = createMetadata(DataType.ORDERBOOK);
+
+		return createMessage(metadata, payload);
+	}
 
 	/**
 	 * UpbitTickerDto를 TickerPayload로 변환한다.
@@ -113,14 +133,39 @@ public class UpbitDataConverter {
     }
 
 	/**
+	 * UpbitOrderBookDto를 OrderBookPayload로 변환한다.
+	 *
+	 * @param dto Upbit orderbook DTO
+	 * @return 변환된 OrderBookPayload
+	 */
+	private OrderBookPayload convertToOrderBookPayload(UpbitOrderBookDto dto) {
+		List<OrderBookUnitPayload> units = dto.getOrderbookUnits().stream()
+			.map(unit -> OrderBookUnitPayload.builder()
+				.askPrice(unit.getAskPrice())
+				.askSize(unit.getAskSize())
+				.bidPrice(unit.getBidPrice())
+				.bidSize(unit.getBidSize())
+				.build())
+			.toList();
+
+		return OrderBookPayload.builder()
+			.marketCode(dto.getMarketCode())
+			.timestamp(dto.getTimestamp())
+			.totalAskSize(dto.getTotalAskSize())
+			.totalBidSize(dto.getTotalBidSize())
+			.orderbookUnits(units)
+			.build();
+	}
+
+	/**
 	 * 공통 MarketDataMessage 생성 로직.
 	 *
 	 * @param metadata 메타데이터
 	 * @param payload 페이로드
 	 * @return 생성된 MarketDataMessage
 	 */
-	private MarketDataMessage createMessage(Metadata metadata, Object payload) {
-		return MarketDataMessage.builder()
+	private <T> MarketDataMessage<T> createMessage(Metadata metadata, T payload) {
+		return MarketDataMessage.<T>builder()
 			.metadata(metadata)
 			.payload(payload)
 			.build();
@@ -195,6 +240,27 @@ public class UpbitDataConverter {
             throw new IllegalArgumentException("TradeTimestamp는 양수여야 한다");
         }
     }
+
+	/**
+	 * OrderBook DTO의 필수 필드를 검증한다.
+	 *
+	 * @param dto 검증할 DTO
+	 * @throws IllegalArgumentException 필수 필드 누락 시
+	 */
+	private void validateOrderBookInput(UpbitOrderBookDto dto) {
+		if (dto == null) {
+			throw new IllegalArgumentException("UpbitOrderBookDto는 null일 수 없다");
+		}
+		if (dto.getMarketCode() == null || dto.getMarketCode().trim().isEmpty()) {
+			throw new IllegalArgumentException("MarketCode는 필수 필드다");
+		}
+		if (dto.getTimestamp() <= 0) {
+			throw new IllegalArgumentException("Timestamp는 양수여야 한다");
+		}
+		if (dto.getOrderbookUnits() == null || dto.getOrderbookUnits().isEmpty()) {
+			throw new IllegalArgumentException("OrderBookUnits는 필수 필드다");
+		}
+	}
 
 	/**
 	 * 지원하는 데이터 타입을 정의하는 열거형.
