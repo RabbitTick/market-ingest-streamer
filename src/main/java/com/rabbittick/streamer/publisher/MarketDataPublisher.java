@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbittick.streamer.global.dto.MarketDataMessage;
+import com.rabbittick.streamer.global.dto.OrderBookPayload;
 import com.rabbittick.streamer.global.dto.TickerPayload;
 import com.rabbittick.streamer.global.dto.TradePayload;
 import lombok.RequiredArgsConstructor;
@@ -43,7 +44,7 @@ public class MarketDataPublisher {
 	 * @param message 발행할 시장 데이터 메시지
 	 * @throws MessagePublishException 메시지 발행 실패 시
 	 */
-	public void publish(MarketDataMessage message) {
+	public void publish(MarketDataMessage<?> message) {
 		try {
 			String routingKey = buildRoutingKey(message);
 			String jsonMessage = objectMapper.writeValueAsString(message);
@@ -70,7 +71,7 @@ public class MarketDataPublisher {
 	 * @param message 라우팅 키를 생성할 메시지
 	 * @return 생성된 라우팅 키
 	 */
-	private String buildRoutingKey(MarketDataMessage message) {
+	private String buildRoutingKey(MarketDataMessage<?> message) {
 		String exchange = message.getMetadata().getExchange().toLowerCase();
 		String dataType = message.getMetadata().getDataType().toLowerCase();
 		String marketCode = extractMarketCode(message);
@@ -85,7 +86,7 @@ public class MarketDataPublisher {
      * @return 추출된 마켓 코드
      * @throws IllegalArgumentException 지원하지 않는 payload 타입인 경우
      */
-    private String extractMarketCode(MarketDataMessage message) {
+    private String extractMarketCode(MarketDataMessage<?> message) {
         Object payload = message.getPayload();
 
         if (payload instanceof TickerPayload) {
@@ -94,6 +95,9 @@ public class MarketDataPublisher {
 
         if (payload instanceof TradePayload) {
             return ((TradePayload) payload).getMarketCode();
+        }
+        if (payload instanceof OrderBookPayload) {
+            return ((OrderBookPayload) payload).getMarketCode();
         }
         throw new IllegalArgumentException("지원하지 않는 payload 타입: " + message.getPayload().getClass().getSimpleName());
     }

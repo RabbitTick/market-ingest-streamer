@@ -22,6 +22,8 @@ upbit:
         enabled: true
       trade:
         enabled: true
+      orderbook:
+        enabled: true
 
 rabbitmq:
   exchange:
