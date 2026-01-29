@@ -21,6 +21,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbittick.streamer.global.dto.MarketDataMessage;
 import com.rabbittick.streamer.global.dto.Metadata;
+import com.rabbittick.streamer.global.dto.OrderBookPayload;
 import com.rabbittick.streamer.global.dto.TickerPayload;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,7 +36,7 @@ class MarketDataPublisherTest {
 	@InjectMocks
 	private MarketDataPublisher publisher;
 
-	private MarketDataMessage tickerMessage;
+	private MarketDataMessage<TickerPayload> tickerMessage;
 
 	private final String exchangeName = "market-data.exchange";
 
@@ -76,7 +77,7 @@ class MarketDataPublisherTest {
 	@DisplayName("다른 거래소와 마켓코드로 올바른 라우팅 키를 생성한다")
 	void publish_WithDifferentExchangeAndMarket_ShouldGenerateCorrectRoutingKey() throws JsonProcessingException {
 		// given
-		MarketDataMessage binanceMessage = createMessageWithExchangeAndMarket("BINANCE", "BTCUSDT");
+		MarketDataMessage<TickerPayload> binanceMessage = createMessageWithExchangeAndMarket("BINANCE", "BTCUSDT");
 		when(objectMapper.writeValueAsString(binanceMessage)).thenReturn("{}");
 
 		// when
@@ -110,7 +111,7 @@ class MarketDataPublisherTest {
 			.tradePrice(BigDecimal.valueOf(2000000))
 			.build();
 
-		MarketDataMessage tradeMessage = MarketDataMessage.builder()
+		MarketDataMessage<TickerPayload> tradeMessage = MarketDataMessage.<TickerPayload>builder()
 			.metadata(tradeMetadata)
 			.payload(payload)
 			.build();
@@ -129,6 +130,43 @@ class MarketDataPublisherTest {
 		);
 
 		assertThat(routingKeyCaptor.getValue()).isEqualTo("upbit.trade.KRW-ETH");
+	}
+
+	@Test
+	@DisplayName("ORDERBOOK 데이터 타입으로 올바른 라우팅 키를 생성한다")
+	void publish_WithOrderBookDataType_ShouldGenerateCorrectRoutingKey() throws JsonProcessingException {
+		// given
+		Metadata metadata = Metadata.builder()
+			.messageId("test-id")
+			.exchange("UPBIT")
+			.dataType("ORDERBOOK")
+			.collectedAt("2023-01-01T00:00:00.000Z")
+			.version("1.0")
+			.build();
+
+		OrderBookPayload payload = OrderBookPayload.builder()
+			.marketCode("KRW-BTC")
+			.build();
+
+		MarketDataMessage<OrderBookPayload> orderBookMessage = MarketDataMessage.<OrderBookPayload>builder()
+			.metadata(metadata)
+			.payload(payload)
+			.build();
+
+		when(objectMapper.writeValueAsString(orderBookMessage)).thenReturn("{}");
+
+		// when
+		publisher.publish(orderBookMessage);
+
+		// then
+		ArgumentCaptor<String> routingKeyCaptor = ArgumentCaptor.forClass(String.class);
+		verify(rabbitTemplate).convertAndSend(
+			eq(exchangeName),
+			routingKeyCaptor.capture(),
+			any(String.class)
+		);
+
+		assertThat(routingKeyCaptor.getValue()).isEqualTo("upbit.orderbook.KRW-BTC");
 	}
 
 	@Test
@@ -166,7 +204,7 @@ class MarketDataPublisherTest {
 	@DisplayName("마켓코드에 특수문자가 있어도 라우팅 키를 올바르게 생성한다")
 	void publish_WithSpecialCharactersInMarketCode_ShouldHandleCorrectly() throws JsonProcessingException {
 		// given
-		MarketDataMessage message = createMessageWithExchangeAndMarket("UPBIT", "KRW-BTC");
+		MarketDataMessage<TickerPayload> message = createMessageWithExchangeAndMarket("UPBIT", "KRW-BTC");
 		when(objectMapper.writeValueAsString(message)).thenReturn("{}");
 
 		// when
@@ -195,7 +233,7 @@ class MarketDataPublisherTest {
 	@DisplayName("대소문자 변환이 올바르게 적용된다")
 	void publish_ShouldConvertToLowerCase() throws JsonProcessingException {
 		// given
-		MarketDataMessage message = createMessageWithExchangeAndMarket("UPBIT", "KRW-BTC");
+		MarketDataMessage<TickerPayload> message = createMessageWithExchangeAndMarket("UPBIT", "KRW-BTC");
 		when(objectMapper.writeValueAsString(message)).thenReturn("{}");
 
 		// when
@@ -215,11 +253,11 @@ class MarketDataPublisherTest {
 		assertThat(routingKey).isEqualTo("upbit.ticker.KRW-BTC");
 	}
 
-	private MarketDataMessage createTickerMessage() {
+	private MarketDataMessage<TickerPayload> createTickerMessage() {
 		return createMessageWithExchangeAndMarket("UPBIT", "KRW-BTC");
 	}
 
-	private MarketDataMessage createMessageWithExchangeAndMarket(String exchange, String marketCode) {
+	private MarketDataMessage<TickerPayload> createMessageWithExchangeAndMarket(String exchange, String marketCode) {
 		Metadata metadata = Metadata.builder()
 			.messageId("test-message-id")
 			.exchange(exchange)
@@ -235,7 +273,7 @@ class MarketDataPublisherTest {
 			.timestamp(1672531200000L)
 			.build();
 
-		return MarketDataMessage.builder()
+		return MarketDataMessage.<TickerPayload>builder()
 			.metadata(metadata)
 			.payload(payload)
 			.build();
