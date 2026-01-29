@@ -4,14 +4,18 @@ import static org.assertj.core.api.Assertions.*;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.rabbittick.streamer.connector.dto.upbit.UpbitOrderBookDto;
 import com.rabbittick.streamer.connector.dto.upbit.UpbitTickerDto;
 import com.rabbittick.streamer.global.dto.MarketDataMessage;
+import com.rabbittick.streamer.global.dto.OrderBookPayload;
+import com.rabbittick.streamer.global.dto.OrderBookUnitPayload;
 import com.rabbittick.streamer.global.dto.TickerPayload;
 
 class UpbitDataConverterTest {
@@ -30,7 +34,7 @@ class UpbitDataConverterTest {
 		UpbitTickerDto upbitDto = createValidUpbitTickerDto();
 
 		// when
-		MarketDataMessage result = converter.convertTickerData(upbitDto);
+		MarketDataMessage<TickerPayload> result = converter.convertTickerData(upbitDto);
 
 		// then
 		assertThat(result).isNotNull();
@@ -95,7 +99,7 @@ class UpbitDataConverterTest {
 		UpbitTickerDto upbitDto = createValidUpbitTickerDto();
 
 		// when
-		MarketDataMessage result = converter.convertTickerData(upbitDto);
+		MarketDataMessage<TickerPayload> result = converter.convertTickerData(upbitDto);
 
 		// then
 		String collectedAt = result.getMetadata().getCollectedAt();
@@ -110,8 +114,8 @@ class UpbitDataConverterTest {
 		UpbitTickerDto upbitDto = createValidUpbitTickerDto();
 
 		// when
-		MarketDataMessage result1 = converter.convertTickerData(upbitDto);
-		MarketDataMessage result2 = converter.convertTickerData(upbitDto);
+		MarketDataMessage<TickerPayload> result1 = converter.convertTickerData(upbitDto);
+		MarketDataMessage<TickerPayload> result2 = converter.convertTickerData(upbitDto);
 
 		// then
 		String messageId1 = result1.getMetadata().getMessageId();
@@ -129,7 +133,7 @@ class UpbitDataConverterTest {
 		upbitDto.setTradePrice(new BigDecimal("70000000.12345678"));
 
 		// when
-		MarketDataMessage result = converter.convertTickerData(upbitDto);
+		MarketDataMessage<TickerPayload> result = converter.convertTickerData(upbitDto);
 
 		// then
 		TickerPayload payload = (TickerPayload)result.getPayload();
@@ -145,12 +149,62 @@ class UpbitDataConverterTest {
 		upbitDto.setAccTradeVolume24h(BigDecimal.ZERO);
 
 		// when
-		MarketDataMessage result = converter.convertTickerData(upbitDto);
+		MarketDataMessage<TickerPayload> result = converter.convertTickerData(upbitDto);
 
 		// then
 		TickerPayload payload = (TickerPayload)result.getPayload();
 		assertThat(payload.getTradeVolume()).isEqualByComparingTo(BigDecimal.ZERO);
 		assertThat(payload.getAccTradeVolume24h()).isEqualByComparingTo(BigDecimal.ZERO);
+	}
+
+	@Test
+	@DisplayName("정상적인 UpbitOrderBookDto를 표준 메시지로 변환한다")
+	void convertOrderBookData_WithValidDto_ShouldReturnStandardMessage() {
+		// given
+		UpbitOrderBookDto upbitDto = createValidUpbitOrderBookDto();
+
+		// when
+		MarketDataMessage<OrderBookPayload> result = converter.convertOrderBookData(upbitDto);
+
+		// then
+		assertThat(result).isNotNull();
+		assertThat(result.getMetadata()).isNotNull();
+		assertThat(result.getPayload()).isNotNull();
+
+		var metadata = result.getMetadata();
+		assertThat(metadata.getDataType()).isEqualTo("ORDERBOOK");
+		assertThat(metadata.getExchange()).isEqualTo("UPBIT");
+
+		OrderBookPayload payload = (OrderBookPayload)result.getPayload();
+		assertThat(payload.getMarketCode()).isEqualTo("KRW-BTC");
+		assertThat(payload.getTotalAskSize()).isEqualByComparingTo(new BigDecimal("12.34"));
+		assertThat(payload.getOrderbookUnits()).hasSize(1);
+
+		OrderBookUnitPayload unit = payload.getOrderbookUnits().get(0);
+		assertThat(unit.getAskPrice()).isEqualByComparingTo(new BigDecimal("70000000"));
+		assertThat(unit.getBidPrice()).isEqualByComparingTo(new BigDecimal("69900000"));
+	}
+
+	@Test
+	@DisplayName("OrderBook DTO가 null이면 IllegalArgumentException을 발생시킨다")
+	void convertOrderBookData_WithNullDto_ShouldThrowException() {
+		// when & then
+		assertThatThrownBy(() -> converter.convertOrderBookData(null))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining("UpbitOrderBookDto는 null일 수 없다");
+	}
+
+	@Test
+	@DisplayName("OrderBook 필수 필드가 누락되면 IllegalArgumentException을 발생시킨다")
+	void convertOrderBookData_WithMissingFields_ShouldThrowException() {
+		// given
+		UpbitOrderBookDto upbitDto = createValidUpbitOrderBookDto();
+		upbitDto.setOrderbookUnits(List.of());
+
+		// when & then
+		assertThatThrownBy(() -> converter.convertOrderBookData(upbitDto))
+			.isInstanceOf(IllegalArgumentException.class)
+			.hasMessageContaining("OrderBookUnits는 필수 필드다");
 	}
 
 	private UpbitTickerDto createValidUpbitTickerDto() {
@@ -166,5 +220,26 @@ class UpbitDataConverterTest {
 		dto.setAccTradeVolume24h(new BigDecimal("123.456"));
 		dto.setTimestamp(1672531200000L);
 		return dto;
+	}
+
+	private UpbitOrderBookDto createValidUpbitOrderBookDto() {
+		UpbitOrderBookDto dto = new UpbitOrderBookDto();
+		dto.setMarketCode("KRW-BTC");
+		dto.setTimestamp(1672531200000L);
+		dto.setTotalAskSize(new BigDecimal("12.34"));
+		dto.setTotalBidSize(new BigDecimal("10.56"));
+		dto.setOrderbookUnits(List.of(createOrderBookUnit(new BigDecimal("70000000"), new BigDecimal("1.2"),
+			new BigDecimal("69900000"), new BigDecimal("0.8"))));
+		return dto;
+	}
+
+	private UpbitOrderBookDto.OrderBookUnit createOrderBookUnit(BigDecimal askPrice, BigDecimal askSize,
+		BigDecimal bidPrice, BigDecimal bidSize) {
+		UpbitOrderBookDto.OrderBookUnit unit = new UpbitOrderBookDto.OrderBookUnit();
+		unit.setAskPrice(askPrice);
+		unit.setAskSize(askSize);
+		unit.setBidPrice(bidPrice);
+		unit.setBidSize(bidSize);
+		return unit;
 	}
 }
