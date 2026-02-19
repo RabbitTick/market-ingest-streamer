@@ -3,6 +3,7 @@ package com.rabbittick.streamer.service;
 import org.springframework.stereotype.Service;
 
 import com.rabbittick.streamer.global.dto.MarketDataMessage;
+import com.rabbittick.streamer.metrics.IngestThroughputMetrics;
 import com.rabbittick.streamer.publisher.MarketDataPublisher;
 
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ import lombok.extern.slf4j.Slf4j;
 public class MarketDataServiceImpl implements MarketDataService {
 
 	private final MarketDataPublisher marketDataPublisher;
+	private final IngestThroughputMetrics ingestThroughputMetrics;
 
 	/**
 	 * 시장 데이터 메시지를 검증하고 발행한다.
@@ -47,6 +49,9 @@ public class MarketDataServiceImpl implements MarketDataService {
 
 		// 메시지 유효성 검증
 		validateMessage(message);
+
+		// 초당 수신량 메트릭 기록
+		ingestThroughputMetrics.record(message.getMetadata().getDataType());
 
 		// RabbitMQ 발행
 		marketDataPublisher.publish(message);
