@@ -32,6 +32,7 @@ import lombok.extern.slf4j.Slf4j;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import reactor.util.retry.Retry;
 
 /**
@@ -60,6 +61,9 @@ public class UpbitConnector implements DisposableBean {
 
 	private static final URI UPBIT_WEBSOCKET_URI = URI.create("wss://api.upbit.com/websocket/v1");
 	private static final Duration PING_INTERVAL = Duration.ofSeconds(60);
+    
+	/** 블로킹 처리 시 동시에 구독할 내부 Mono 개수 상한 (boundedElastic 스레드 풀 사용). */
+	private static final int PROCESSING_CONCURRENCY = 32;
 
 	/**
 	 * 사용할 마켓코드 환경 설정 (development, production, full)
@@ -280,8 +284,10 @@ public class UpbitConnector implements DisposableBean {
 			.then();
 	}
 
-    /**
-     * WebSocket으로부터 메시지를 수신하고 처리한다.
+	/**
+	 * WebSocket으로부터 메시지를 수신하고 처리한다.
+     * 블로킹 작업(파싱·변환·RabbitMQ 발행)은 boundedElastic 스케줄러에서 실행되어
+     * 수신 스레드가 다음 메시지를 계속 받을 수 있도록 한다.
      *
      * @param session WebSocket 세션
      * @return 메시지 수신 완료를 나타내는 Mono
@@ -289,7 +295,9 @@ public class UpbitConnector implements DisposableBean {
     private Mono<Void> receiveAndProcessMessages(WebSocketSession session) {
         return session.receive()
                 .map(WebSocketMessage::getPayloadAsText)
-                .flatMap(this::parseMessage)
+                .flatMap(jsonMessage ->
+                                parseMessage(jsonMessage).subscribeOn(Schedulers.boundedElastic()),
+                        PROCESSING_CONCURRENCY)
                 .doOnError(error -> log.error("메시지 처리 중 오류 발생", error))
                 .onErrorContinue((error, obj) ->
                         log.warn("메시지 처리 실패, 다음 메시지 계속 처리: {}", error.getMessage()))
