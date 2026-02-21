@@ -48,13 +48,13 @@ class MarketDataPublisherTest {
 
 	@Test
 	@DisplayName("정상적인 메시지를 올바른 라우팅 키로 발행한다")
-	void publish_WithValidMessage_ShouldPublishWithCorrectRoutingKey() throws JsonProcessingException {
+	void publishAsync_WithValidMessage_ShouldPublishWithCorrectRoutingKey() throws JsonProcessingException {
 		// given
 		String expectedJson = "{\"metadata\":{...},\"payload\":{...}}";
 		when(objectMapper.writeValueAsString(tickerMessage)).thenReturn(expectedJson);
 
 		// when
-		publisher.publish(tickerMessage);
+		publisher.publishAsync(tickerMessage).block();
 
 		// then
 		ArgumentCaptor<String> routingKeyCaptor = ArgumentCaptor.forClass(String.class);
@@ -75,13 +75,13 @@ class MarketDataPublisherTest {
 
 	@Test
 	@DisplayName("다른 거래소와 마켓코드로 올바른 라우팅 키를 생성한다")
-	void publish_WithDifferentExchangeAndMarket_ShouldGenerateCorrectRoutingKey() throws JsonProcessingException {
+	void publishAsync_WithDifferentExchangeAndMarket_ShouldGenerateCorrectRoutingKey() throws JsonProcessingException {
 		// given
 		MarketDataMessage<TickerPayload> binanceMessage = createMessageWithExchangeAndMarket("BINANCE", "BTCUSDT");
 		when(objectMapper.writeValueAsString(binanceMessage)).thenReturn("{}");
 
 		// when
-		publisher.publish(binanceMessage);
+		publisher.publishAsync(binanceMessage).block();
 
 		// then
 		ArgumentCaptor<String> routingKeyCaptor = ArgumentCaptor.forClass(String.class);
@@ -96,7 +96,7 @@ class MarketDataPublisherTest {
 
 	@Test
 	@DisplayName("TRADE 데이터 타입으로 올바른 라우팅 키를 생성한다")
-	void publish_WithTradeDataType_ShouldGenerateCorrectRoutingKey() throws JsonProcessingException {
+	void publishAsync_WithTradeDataType_ShouldGenerateCorrectRoutingKey() throws JsonProcessingException {
 		// given
 		Metadata tradeMetadata = Metadata.builder()
 			.messageId("test-id")
@@ -119,7 +119,7 @@ class MarketDataPublisherTest {
 		when(objectMapper.writeValueAsString(tradeMessage)).thenReturn("{}");
 
 		// when
-		publisher.publish(tradeMessage);
+		publisher.publishAsync(tradeMessage).block();
 
 		// then
 		ArgumentCaptor<String> routingKeyCaptor = ArgumentCaptor.forClass(String.class);
@@ -134,7 +134,7 @@ class MarketDataPublisherTest {
 
 	@Test
 	@DisplayName("ORDERBOOK 데이터 타입으로 올바른 라우팅 키를 생성한다")
-	void publish_WithOrderBookDataType_ShouldGenerateCorrectRoutingKey() throws JsonProcessingException {
+	void publishAsync_WithOrderBookDataType_ShouldGenerateCorrectRoutingKey() throws JsonProcessingException {
 		// given
 		Metadata metadata = Metadata.builder()
 			.messageId("test-id")
@@ -156,7 +156,7 @@ class MarketDataPublisherTest {
 		when(objectMapper.writeValueAsString(orderBookMessage)).thenReturn("{}");
 
 		// when
-		publisher.publish(orderBookMessage);
+		publisher.publishAsync(orderBookMessage).block();
 
 		// then
 		ArgumentCaptor<String> routingKeyCaptor = ArgumentCaptor.forClass(String.class);
@@ -170,45 +170,44 @@ class MarketDataPublisherTest {
 	}
 
 	@Test
-	@DisplayName("JSON 직렬화 실패 시 MessagePublishException을 발생시킨다")
-	void publish_WhenJsonSerializationFails_ShouldThrowMessagePublishException() throws JsonProcessingException {
+	@DisplayName("JSON 직렬화 실패 시 Mono가 MessagePublishException으로 실패한다")
+	void publishAsync_WhenJsonSerializationFails_ShouldEmitMessagePublishException() throws JsonProcessingException {
 		// given
 		JsonProcessingException jsonException = new JsonProcessingException("JSON 변환 실패") {
 		};
 		when(objectMapper.writeValueAsString(tickerMessage)).thenThrow(jsonException);
 
 		// when & then
-		assertThatThrownBy(() -> publisher.publish(tickerMessage))
+		assertThatThrownBy(() -> publisher.publishAsync(tickerMessage).block())
 			.isInstanceOf(MarketDataPublisher.MessagePublishException.class)
 			.hasMessageContaining("메시지 직렬화 실패")
 			.hasCause(jsonException);
 	}
 
 	@Test
-	@DisplayName("RabbitTemplate에서 예외 발생 시 MessagePublishException을 발생시킨다")
-	void publish_WhenRabbitTemplateThrowsException_ShouldThrowMessagePublishException() throws JsonProcessingException {
+	@DisplayName("RabbitTemplate에서 예외 발생 시 MessagePublishException으로 Mono가 실패한다")
+	void publishAsync_WhenRabbitTemplateThrows_ShouldEmitError() throws JsonProcessingException {
 		// given
 		when(objectMapper.writeValueAsString(tickerMessage)).thenReturn("{}");
-		RuntimeException rabbitException = new RuntimeException("RabbitMQ 연결 실패");
-		doThrow(rabbitException).when(rabbitTemplate)
+		doThrow(new RuntimeException("RabbitMQ 연결 실패")).when(rabbitTemplate)
 			.convertAndSend(any(String.class), any(String.class), any(String.class));
 
 		// when & then
-		assertThatThrownBy(() -> publisher.publish(tickerMessage))
+		assertThatThrownBy(() -> publisher.publishAsync(tickerMessage).block())
 			.isInstanceOf(MarketDataPublisher.MessagePublishException.class)
 			.hasMessageContaining("메시지 발행 실패")
-			.hasCause(rabbitException);
+			.hasCauseInstanceOf(RuntimeException.class);
 	}
 
 	@Test
 	@DisplayName("마켓코드에 특수문자가 있어도 라우팅 키를 올바르게 생성한다")
-	void publish_WithSpecialCharactersInMarketCode_ShouldHandleCorrectly() throws JsonProcessingException {
+	void publishAsync_WithSpecialCharactersInMarketCode_ShouldHandleCorrectly() throws JsonProcessingException {
 		// given
 		MarketDataMessage<TickerPayload> message = createMessageWithExchangeAndMarket("UPBIT", "KRW-BTC");
 		when(objectMapper.writeValueAsString(message)).thenReturn("{}");
 
 		// when
-		publisher.publish(message);
+		publisher.publishAsync(message).block();
 
 		// then
 		ArgumentCaptor<String> routingKeyCaptor = ArgumentCaptor.forClass(String.class);
@@ -223,21 +222,21 @@ class MarketDataPublisherTest {
 
 	@Test
 	@DisplayName("null 메시지 입력 시 NullPointerException을 발생시킨다")
-	void publish_WithNullMessage_ShouldThrowNullPointerException() {
+	void publishAsync_WithNullMessage_ShouldThrowNullPointerException() {
 		// when & then
-		assertThatThrownBy(() -> publisher.publish(null))
+		assertThatThrownBy(() -> publisher.publishAsync(null).block())
 			.isInstanceOf(NullPointerException.class);
 	}
 
 	@Test
 	@DisplayName("대소문자 변환이 올바르게 적용된다")
-	void publish_ShouldConvertToLowerCase() throws JsonProcessingException {
+	void publishAsync_ShouldConvertToLowerCase() throws JsonProcessingException {
 		// given
 		MarketDataMessage<TickerPayload> message = createMessageWithExchangeAndMarket("UPBIT", "KRW-BTC");
 		when(objectMapper.writeValueAsString(message)).thenReturn("{}");
 
 		// when
-		publisher.publish(message);
+		publisher.publishAsync(message).block();
 
 		// then
 		ArgumentCaptor<String> routingKeyCaptor = ArgumentCaptor.forClass(String.class);

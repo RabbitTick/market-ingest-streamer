@@ -12,6 +12,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import reactor.core.publisher.Mono;
+
 import com.rabbittick.streamer.global.dto.MarketDataMessage;
 import com.rabbittick.streamer.global.dto.Metadata;
 import com.rabbittick.streamer.global.dto.TickerPayload;
@@ -36,23 +38,26 @@ class MarketDataServiceImplTest {
 	@Test
 	@DisplayName("정상적인 메시지를 처리하고 Publisher를 호출한다")
 	void processMarketData_WithValidMessage_ShouldCallPublisher() {
+		// given
+		when(marketDataPublisher.publishAsync(any())).thenReturn(Mono.empty());
+
 		// when
-		marketDataService.processMarketData(validMessage);
+		marketDataService.processMarketData(validMessage).block();
 
 		// then
-		verify(marketDataPublisher).publish(validMessage);
+		verify(marketDataPublisher).publishAsync(validMessage);
 	}
 
 	@Test
 	@DisplayName("null 메시지 입력 시 NullPointerException을 발생시킨다")
 	void processMarketData_WithNullMessage_ShouldThrowNullPointerException() {
 		// when & then
-		assertThatThrownBy(() -> marketDataService.processMarketData(null))
+		assertThatThrownBy(() -> marketDataService.processMarketData(null).block())
 			.isInstanceOf(NullPointerException.class)
 			.hasMessageContaining(
 				"Cannot invoke \"com.rabbittick.streamer.global.dto.MarketDataMessage.getMetadata()\" because \"message\" is null");
 
-		verify(marketDataPublisher, never()).publish(any());
+		verify(marketDataPublisher, never()).publishAsync(any());
 	}
 
 	@Test
@@ -62,12 +67,12 @@ class MarketDataServiceImplTest {
 		validMessage.setMetadata(null);
 
 		// when & then
-		assertThatThrownBy(() -> marketDataService.processMarketData(validMessage))
+		assertThatThrownBy(() -> marketDataService.processMarketData(validMessage).block())
 			.isInstanceOf(NullPointerException.class)
 			.hasMessageContaining(
 				"Cannot invoke \"com.rabbittick.streamer.global.dto.Metadata.getMessageId()\" because the return value of \"com.rabbittick.streamer.global.dto.MarketDataMessage.getMetadata()\" is null");
 
-		verify(marketDataPublisher, never()).publish(any());
+		verify(marketDataPublisher, never()).publishAsync(any());
 	}
 
 	@Test
@@ -77,11 +82,11 @@ class MarketDataServiceImplTest {
 		validMessage.setPayload(null);
 
 		// when & then
-		assertThatThrownBy(() -> marketDataService.processMarketData(validMessage))
+		assertThatThrownBy(() -> marketDataService.processMarketData(validMessage).block())
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("페이로드는 필수이다");
 
-		verify(marketDataPublisher, never()).publish(any());
+		verify(marketDataPublisher, never()).publishAsync(any());
 	}
 
 	@Test
@@ -91,11 +96,11 @@ class MarketDataServiceImplTest {
 		validMessage.getMetadata().setMessageId(null);
 
 		// when & then
-		assertThatThrownBy(() -> marketDataService.processMarketData(validMessage))
+		assertThatThrownBy(() -> marketDataService.processMarketData(validMessage).block())
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("Message ID는 필수이다");
 
-		verify(marketDataPublisher, never()).publish(any());
+		verify(marketDataPublisher, never()).publishAsync(any());
 	}
 
 	@Test
@@ -105,11 +110,11 @@ class MarketDataServiceImplTest {
 		validMessage.getMetadata().setMessageId("   ");
 
 		// when & then
-		assertThatThrownBy(() -> marketDataService.processMarketData(validMessage))
+		assertThatThrownBy(() -> marketDataService.processMarketData(validMessage).block())
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("Message ID는 필수이다");
 
-		verify(marketDataPublisher, never()).publish(any());
+		verify(marketDataPublisher, never()).publishAsync(any());
 	}
 
 	@Test
@@ -119,11 +124,11 @@ class MarketDataServiceImplTest {
 		validMessage.getMetadata().setExchange(null);
 
 		// when & then
-		assertThatThrownBy(() -> marketDataService.processMarketData(validMessage))
+		assertThatThrownBy(() -> marketDataService.processMarketData(validMessage).block())
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("Exchange는 필수이다");
 
-		verify(marketDataPublisher, never()).publish(any());
+		verify(marketDataPublisher, never()).publishAsync(any());
 	}
 
 	@Test
@@ -133,22 +138,22 @@ class MarketDataServiceImplTest {
 		validMessage.getMetadata().setDataType(null);
 
 		// when & then
-		assertThatThrownBy(() -> marketDataService.processMarketData(validMessage))
+		assertThatThrownBy(() -> marketDataService.processMarketData(validMessage).block())
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("DataType은 필수이다");
 
-		verify(marketDataPublisher, never()).publish(any());
+		verify(marketDataPublisher, never()).publishAsync(any());
 	}
 
 	@Test
-	@DisplayName("Publisher에서 예외 발생 시 그대로 전파한다")
-	void processMarketData_WhenPublisherThrowsException_ShouldPropagateException() {
+	@DisplayName("Publisher에서 Mono가 에러를 반환하면 그대로 전파한다")
+	void processMarketData_WhenPublisherReturnsErrorMono_ShouldPropagateException() {
 		// given
 		RuntimeException publishException = new RuntimeException("발행 실패");
-		doThrow(publishException).when(marketDataPublisher).publish(any());
+		when(marketDataPublisher.publishAsync(any())).thenReturn(Mono.error(publishException));
 
 		// when & then
-		assertThatThrownBy(() -> marketDataService.processMarketData(validMessage))
+		assertThatThrownBy(() -> marketDataService.processMarketData(validMessage).block())
 			.isInstanceOf(RuntimeException.class)
 			.hasMessage("발행 실패");
 	}
@@ -169,12 +174,13 @@ class MarketDataServiceImplTest {
 				.marketCode("KRW-BTC")
 				.build())
 			.build();
+		when(marketDataPublisher.publishAsync(any())).thenReturn(Mono.empty());
 
 		// when
-		marketDataService.processMarketData(message);
+		marketDataService.processMarketData(message).block();
 
 		// then
-		verify(marketDataPublisher).publish(message);
+		verify(marketDataPublisher).publishAsync(message);
 	}
 
 	@Test
@@ -184,11 +190,11 @@ class MarketDataServiceImplTest {
 		validMessage.getMetadata().setExchange("");
 
 		// when & then
-		assertThatThrownBy(() -> marketDataService.processMarketData(validMessage))
+		assertThatThrownBy(() -> marketDataService.processMarketData(validMessage).block())
 			.isInstanceOf(IllegalArgumentException.class)
 			.hasMessageContaining("Exchange는 필수이다");
 
-		verify(marketDataPublisher, never()).publish(any());
+		verify(marketDataPublisher, never()).publishAsync(any());
 	}
 
 	private MarketDataMessage createValidMarketDataMessage() {
