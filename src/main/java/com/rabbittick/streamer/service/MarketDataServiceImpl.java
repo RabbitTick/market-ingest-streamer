@@ -8,6 +8,7 @@ import com.rabbittick.streamer.publisher.MarketDataPublisher;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import reactor.core.publisher.Mono;
 
 /**
  * 시장 데이터 처리 서비스의 구현체.
@@ -32,16 +33,16 @@ public class MarketDataServiceImpl implements MarketDataService {
 	private final IngestThroughputMetrics ingestThroughputMetrics;
 
 	/**
-	 * 시장 데이터 메시지를 검증하고 발행한다.
+	 * 시장 데이터 메시지를 검증·메트릭 기록 후 비동기로 발행한다.
 	 *
 	 * <p>이 메서드는 어떤 거래소의 데이터인지 알지 못하며,
 	 * 표준 DTO의 유효성만 검증하고 발행을 위임한다.
 	 *
 	 * @param message 처리할 시장 데이터 메시지
-	 * @throws IllegalArgumentException 메시지 검증 실패 시
+	 * @return 발행 완료 시 onComplete
 	 */
 	@Override
-	public void processMarketData(MarketDataMessage message) {
+	public Mono<Void> processMarketData(MarketDataMessage message) {
 		log.trace("시장 데이터 처리 시작 - Message ID: {}, Exchange: {}, DataType: {}",
 			message.getMetadata().getMessageId(),
 			message.getMetadata().getExchange(),
@@ -53,11 +54,10 @@ public class MarketDataServiceImpl implements MarketDataService {
 		// 초당 수신량 메트릭 기록
 		ingestThroughputMetrics.record(message.getMetadata().getDataType());
 
-		// RabbitMQ 발행
-		marketDataPublisher.publish(message);
-
-		log.trace("시장 데이터 처리 완료 - Message ID: {}",
-			message.getMetadata().getMessageId());
+		// RabbitMQ 비동기 발행
+		return marketDataPublisher.publishAsync(message)
+			.doOnSuccess(v -> log.trace("시장 데이터 처리 완료 - Message ID: {}",
+				message.getMetadata().getMessageId()));
 	}
 
 	/**
