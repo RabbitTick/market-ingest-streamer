@@ -2,6 +2,8 @@ package com.rabbittick.streamer.service;
 
 import com.rabbittick.streamer.global.dto.MarketDataMessage;
 
+import reactor.core.publisher.Mono;
+
 /**
  * 시장 데이터 처리를 담당하는 서비스 인터페이스.
  *
@@ -19,13 +21,13 @@ import com.rabbittick.streamer.global.dto.MarketDataMessage;
 public interface MarketDataService {
 
 	/**
-	 * 표준화된 시장 데이터 메시지를 처리한다.
+	 * 표준화된 시장 데이터 메시지를 검증·메트릭 기록 후 비동기로 발행한다.
 	 *
 	 * <p>이 메서드는 어떤 거래소에서 온 데이터인지 알 필요가 없으며,
 	 * 표준 DTO 형태로 전달받은 데이터를 처리하고 다음 단계로 전달한다.
 	 *
 	 * @param message 처리할 시장 데이터 메시지
-	 * @throws IllegalArgumentException 메시지가 null이거나 필수 필드가 누락된 경우
+	 * @return 발행이 완료되거나 실패 처리 시 onComplete
 	 */
-	void processMarketData(MarketDataMessage message);
+	Mono<Void> processMarketData(MarketDataMessage message);
 }

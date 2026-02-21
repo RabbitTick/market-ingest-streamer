@@ -330,24 +330,21 @@ public class UpbitConnector implements DisposableBean {
                 case "ticker":
                     if (tickerEnabled) {
                         return parseTickerData(jsonMessage)
-                                .doOnNext(this::processTickerData)
-                                .then();
+                                .flatMap(this::processTickerData);
                     }
                     break;
 
                 case "trade":
                     if (tradeEnabled) {
                         return parseTradeData(jsonMessage)
-                                .doOnNext(this::processTradeData)
-                                .then();
+                                .flatMap(this::processTradeData);
                     }
                     break;
 
                 case "orderbook":
                     if (orderbookEnabled) {
                         return parseOrderBookData(jsonMessage)
-                                .doOnNext(this::processOrderBookData)
-                                .then();
+                                .flatMap(this::processOrderBookData);
                     }
                     break;
 
@@ -423,24 +420,24 @@ public class UpbitConnector implements DisposableBean {
 	 * 수신된 Ticker 데이터를 처리한다.
 	 *
 	 * <p>Upbit DTO를 표준 DTO로 변환하고 서비스 계층으로 전달한다.
-	 * 각 데이터 타입별로 명시적인 변환 메서드를 호출한다.
 	 *
 	 * @param upbitDto 수신된 Upbit ticker DTO
+	 * @return 발행 Mono
 	 */
-	private void processTickerData(UpbitTickerDto upbitDto) {
+	private Mono<Void> processTickerData(UpbitTickerDto upbitDto) {
+		log.trace("Ticker 데이터 수신: {} - {}",
+			upbitDto.getMarketCode(), upbitDto.getTradePrice());
+
 		try {
-			log.trace("Ticker 데이터 수신: {} - {}",
-				upbitDto.getMarketCode(), upbitDto.getTradePrice());
-
 			MarketDataMessage<?> message = upbitDataConverter.convertTickerData(upbitDto);
-
-			marketDataService.processMarketData(message);
-
+			return marketDataService.processMarketData(message);
 		} catch (IllegalArgumentException e) {
 			log.warn("Ticker 데이터 검증 실패: {} - {}",
 				upbitDto.getMarketCode(), e.getMessage());
+			return Mono.empty();
 		} catch (Exception e) {
 			log.error("Ticker 데이터 처리 실패: {}", upbitDto.getMarketCode(), e);
+			return Mono.empty();
 		}
 	}
 
@@ -448,21 +445,22 @@ public class UpbitConnector implements DisposableBean {
      * 수신된 Trade 데이터를 처리한다.
      *
      * @param upbitDto 수신된 Upbit trade DTO
+     * @return 발행 Mono
      */
-    private void processTradeData(UpbitTradeDto upbitDto) {
+    private Mono<Void> processTradeData(UpbitTradeDto upbitDto) {
+        log.trace("Trade 데이터 수신: {} - {} ({})",
+                upbitDto.getMarketCode(), upbitDto.getTradePrice(), upbitDto.getAskBid());
+
         try {
-            log.trace("Trade 데이터 수신: {} - {} ({})",
-                    upbitDto.getMarketCode(), upbitDto.getTradePrice(), upbitDto.getAskBid());
-
             MarketDataMessage<?> message = upbitDataConverter.convertTradeData(upbitDto);
-
-            marketDataService.processMarketData(message);
-
+            return marketDataService.processMarketData(message);
         } catch (IllegalArgumentException e) {
             log.warn("Trade 데이터 검증 실패: {} - {}",
                     upbitDto.getMarketCode(), e.getMessage());
+            return Mono.empty();
         } catch (Exception e) {
             log.error("Trade 데이터 처리 실패: {}", upbitDto.getMarketCode(), e);
+            return Mono.empty();
         }
     }
 
@@ -470,22 +468,23 @@ public class UpbitConnector implements DisposableBean {
      * 수신된 OrderBook 데이터를 처리한다.
      *
      * @param upbitDto 수신된 Upbit orderbook DTO
+     * @return 발행 Mono
      */
-    private void processOrderBookData(UpbitOrderBookDto upbitDto) {
+    private Mono<Void> processOrderBookData(UpbitOrderBookDto upbitDto) {
+        log.trace("OrderBook 데이터 수신: {} - units: {}",
+            upbitDto.getMarketCode(),
+            upbitDto.getOrderbookUnits() == null ? 0 : upbitDto.getOrderbookUnits().size());
+
         try {
-            log.trace("OrderBook 데이터 수신: {} - units: {}",
-                upbitDto.getMarketCode(),
-                upbitDto.getOrderbookUnits() == null ? 0 : upbitDto.getOrderbookUnits().size());
-
             MarketDataMessage<?> message = upbitDataConverter.convertOrderBookData(upbitDto);
-
-            marketDataService.processMarketData(message);
-
+            return marketDataService.processMarketData(message);
         } catch (IllegalArgumentException e) {
             log.warn("OrderBook 데이터 검증 실패: {} - {}",
                 upbitDto.getMarketCode(), e.getMessage());
+            return Mono.empty();
         } catch (Exception e) {
             log.error("OrderBook 데이터 처리 실패: {}", upbitDto.getMarketCode(), e);
+            return Mono.empty();
         }
     }
 
