@@ -29,10 +29,6 @@ rabbitmq:
   exchange:
     market-data: market-data.exchange
 
-test:
-  consumer:
-    enabled: true
-
 logging:
   level:
     com.rabbittick.streamer: debug
