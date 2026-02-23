@@ -1,5 +1,6 @@
 package com.rabbittick.streamer.publisher;
 
+import com.rabbittick.streamer.metrics.PublishFailureMetrics;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -36,8 +37,9 @@ public class MarketDataPublisher {
 
 	private final ObjectMapper objectMapper;
 	private final Sender sender;
+    private final PublishFailureMetrics publishFailureMetrics;
 
-	@Value("${rabbitmq.exchange.market-data}")
+    @Value("${rabbitmq.exchange.market-data}")
 	private String exchangeName;
 
 	/**
@@ -50,13 +52,17 @@ public class MarketDataPublisher {
 	 * @param message 발행할 시장 데이터 메시지
 	 * @return 발행 완료 시 onComplete, 실패 시 onError를 전파하는 Mono
 	 */
-	public Mono<Void> publishAsync(MarketDataMessage<?> message) {
+    public Mono<Void> publishAsync(MarketDataMessage<?> message) {
         return Mono.fromCallable(() -> createOutboundMessage(message))
-            .flatMap(outbound -> sender.send(Mono.just(outbound)))
-            .doOnSuccess(v -> log.debug("메시지 발행 성공 - Routing Key: {}, Message ID: {}, thread: {}",
-                buildRoutingKey(message), message.getMetadata().getMessageId(), Thread.currentThread().getName()))
-            .doOnError(e -> log.error("메시지 발행 실패 - Message ID: {}", 
-                message.getMetadata().getMessageId(), e));
+                .flatMap(outbound -> sender.send(Mono.just(outbound)))
+                .doOnSuccess(v -> log.debug("메시지 발행 성공 - Routing Key: {}, Message ID: {}, thread: {}",
+                        buildRoutingKey(message), message.getMetadata().getMessageId(), Thread.currentThread().getName()))
+                .doOnError(e -> {
+                    String dataType = message.getMetadata().getDataType();
+                    publishFailureMetrics.record(dataType);
+                    log.error("메시지 발행 실패 - Message ID: {}, DataType: {}",
+                            message.getMetadata().getMessageId(), dataType, e);
+                });
     }
 
 	/**
