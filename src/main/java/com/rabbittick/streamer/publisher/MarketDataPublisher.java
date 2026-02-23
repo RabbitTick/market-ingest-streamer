@@ -1,6 +1,5 @@
 package com.rabbittick.streamer.publisher;
 
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -13,13 +12,14 @@ import com.rabbittick.streamer.global.dto.TradePayload;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
+import reactor.rabbitmq.OutboundMessage;
+import reactor.rabbitmq.Sender;
 
 /**
- * 시장 데이터를 RabbitMQ에 발행하는 역할을 담당하는 퍼블리셔.
+ * 시장 데이터를 RabbitMQ에 발행하는 퍼블리셔.
  *
- * <p>publishAsync는 RabbitTemplate 발행을 boundedElastic 스레드에서 수행하여
- * 호출 스레드를 블로킹하지 않고 Mono로 완료를 전달한다.
+ * <p>reactor-rabbitmq의 Sender를 사용하여 논블로킹 I/O로 메시지를 발행한다.
+ * 스레드가 응답을 기다리지 않고 즉시 반환된다.
  *
  * <p>주요 책임:
  * <ul>
@@ -34,43 +34,45 @@ import reactor.core.scheduler.Schedulers;
 @RequiredArgsConstructor
 public class MarketDataPublisher {
 
-	private final RabbitTemplate rabbitTemplate;
 	private final ObjectMapper objectMapper;
+	private final Sender sender;
 
 	@Value("${rabbitmq.exchange.market-data}")
 	private String exchangeName;
 
 	/**
 	 * MarketDataMessage를 RabbitMQ에 발행한다.
-	 * 발행 작업은 boundedElastic 스레드에서 수행되며, 반환된 Mono를 구독하여 완료·실패를 처리할 수 있다.
 	 *
-	 * <p>라우팅 키: {exchange}.{dataType}.{marketCode} 형식
+	 * <p>발행 작업은 reactor-rabbitmq의 boundedElastic 스케줄러에서 수행된다.
+	 * 반환된 Mono를 구독하여 완료·실패를 처리할 수 있다.
+	 * 라우팅 키 형식: {exchange}.{dataType}.{marketCode}
 	 *
 	 * @param message 발행할 시장 데이터 메시지
-	 * @return 발행 완료 시 onComplete, 실패 시 onError
+	 * @return 발행 완료 시 onComplete, 실패 시 onError를 전파하는 Mono
 	 */
 	public Mono<Void> publishAsync(MarketDataMessage<?> message) {
-		try {
-			String routingKey = buildRoutingKey(message);
-			String jsonMessage = objectMapper.writeValueAsString(message);
+        return Mono.fromCallable(() -> createOutboundMessage(message))
+            .flatMap(outbound -> sender.send(Mono.just(outbound)))
+            .doOnSuccess(v -> log.debug("메시지 발행 성공 - Routing Key: {}, Message ID: {}, thread: {}",
+                buildRoutingKey(message), message.getMetadata().getMessageId(), Thread.currentThread().getName()))
+            .doOnError(e -> log.error("메시지 발행 실패 - Message ID: {}", 
+                message.getMetadata().getMessageId(), e));
+    }
 
-			return Mono.<Void>fromRunnable(() -> {
-				try {
-					rabbitTemplate.convertAndSend(exchangeName, routingKey, jsonMessage);
-					log.debug("메시지 발행 성공 - Routing Key: {}, Message ID: {}, 스레드: {}",
-						routingKey, message.getMetadata().getMessageId(), Thread.currentThread().getName());
-				} catch (Exception e) {
-					log.error("메시지 발행 실패 - Message ID: {}", message.getMetadata().getMessageId(), e);
-					throw new MessagePublishException("메시지 발행 실패", e);
-				}
-			})
-				.subscribeOn(Schedulers.boundedElastic())
-				.then();
-		} catch (JsonProcessingException e) {
-			log.error("JSON 직렬화 실패 - Message ID: {}", message.getMetadata().getMessageId(), e);
-			return Mono.error(new MessagePublishException("메시지 직렬화 실패", e));
-		}
-	}
+	/**
+	 * MarketDataMessage를 Exchange·라우팅 키·JSON 바이트로 변환하여 OutboundMessage를 만든다.
+	 *
+	 * @param message 변환할 시장 데이터 메시지
+	 * @return RabbitMQ로 보낼 OutboundMessage
+	 * @throws JsonProcessingException JSON 직렬화 실패 시
+	 */
+	private OutboundMessage createOutboundMessage(MarketDataMessage<?> message) 
+            throws JsonProcessingException {
+        String routingKey = buildRoutingKey(message);
+        byte[] body = objectMapper.writeValueAsBytes(message);
+
+        return new OutboundMessage(exchangeName, routingKey, body);
+    }
 
 	/**
 	 * 메시지 메타데이터를 기반으로 라우팅 키를 생성한다.
@@ -117,6 +119,12 @@ public class MarketDataPublisher {
 	 */
 	public static class MessagePublishException extends RuntimeException {
 
+		/**
+		 * 메시지와 원인을 지정하여 예외를 생성한다.
+		 *
+		 * @param message 예외 메시지
+		 * @param cause 원인 예외
+		 */
 		public MessagePublishException(String message, Throwable cause) {
 			super(message, cause);
 		}
