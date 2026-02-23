@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
 import reactor.rabbitmq.OutboundMessage;
+import reactor.rabbitmq.OutboundMessageResult;
 import reactor.rabbitmq.Sender;
 
 /**
@@ -54,8 +55,10 @@ public class MarketDataPublisher {
 	 */
     public Mono<Void> publishAsync(MarketDataMessage<?> message) {
         return Mono.fromCallable(() -> createOutboundMessage(message))
-                .flatMap(outbound -> sender.send(Mono.just(outbound)))
-                .doOnSuccess(v -> log.debug("메시지 발행 성공 - Routing Key: {}, Message ID: {}, thread: {}",
+                .flatMapMany(outbound -> sender.sendWithPublishConfirms(Mono.just(outbound)))
+                .next()
+                .flatMap(result -> handlePublishResult(result, message))
+                .doOnSuccess(v -> log.debug("메시지 발행 확인 - Routing Key: {}, Message ID: {}, thread: {}",
                         buildRoutingKey(message), message.getMetadata().getMessageId(), Thread.currentThread().getName()))
                 .doOnError(e -> {
                     String dataType = message.getMetadata().getDataType();
@@ -63,6 +66,24 @@ public class MarketDataPublisher {
                     log.error("메시지 발행 실패 - Message ID: {}, DataType: {}",
                             message.getMetadata().getMessageId(), dataType, e);
                 });
+    }
+
+	/**
+     * 브로커의 발행 확인 결과를 처리한다.
+     *
+     * @param result 브로커로부터 받은 확인 결과
+     * @param message 원본 메시지 (로깅용)
+     * @return ACK이면 빈 Mono, NACK이면 에러 Mono
+     */
+    private Mono<Void> handlePublishResult(OutboundMessageResult result, MarketDataMessage<?> message) {
+        if (result.isAck()) {
+            return Mono.empty();
+        } else {
+            return Mono.error(new MessagePublishException(
+                String.format("브로커가 메시지를 거부 - Message ID: %s", 
+                    message.getMetadata().getMessageId()), 
+                null));
+        }
     }
 
 	/**
