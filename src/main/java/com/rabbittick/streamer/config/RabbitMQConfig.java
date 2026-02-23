@@ -4,7 +4,6 @@ import org.springframework.amqp.core.AmqpAdmin;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,7 +14,11 @@ import org.springframework.util.StringUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
+import reactor.rabbitmq.RabbitFlux;
+import reactor.rabbitmq.Sender;
+import reactor.rabbitmq.SenderOptions;
 
 /**
  * RabbitMQ 관련 설정을 관리하는 Configuration 클래스.
@@ -25,7 +28,7 @@ import lombok.extern.slf4j.Slf4j;
  *   <li>Topic Exchange 설정</li>
  *   <li>JSON 메시지 변환기 설정</li>
  *   <li>RabbitMQ 관리 도구 설정</li>
- *   <li>메시지 발행 템플릿 설정</li>
+ *   <li>논블로킹 메시지 발행을 위한 reactor-rabbitmq Sender 설정</li>
  * </ul>
  */
 @Slf4j
@@ -34,6 +37,21 @@ public class RabbitMQConfig {
 
 	@Value("${rabbitmq.exchange.market-data}")
 	private String exchangeName;
+
+	@Value("${spring.rabbitmq.host}")
+    private String host;
+
+    @Value("${spring.rabbitmq.port}")
+    private int port;
+
+    @Value("${spring.rabbitmq.username}")
+    private String username;
+
+    @Value("${spring.rabbitmq.password}")
+    private String password;
+
+	/** reactor-rabbitmq Sender 인스턴스. Bean 반환 및 종료 시 정리에 사용한다. */
+	private Sender sender;
 
 	/**
 	 * 설정값이 올바르게 주입되었는지 검증한다.
@@ -94,37 +112,43 @@ public class RabbitMQConfig {
 	}
 
 	/**
-	 * 메시지 발행을 위한 RabbitTemplate을 생성한다.
+	 * 논블로킹 메시지 발행을 위한 Sender를 생성한다.
 	 *
-	 * <p>발행 확인과 에러 처리를 위한 콜백을 설정하여
-	 * 메시지 발행의 신뢰성을 높인다.
+	 * <p>SenderOptions.connectionFactory()를 사용하면 Connection 관리를
+	 * reactor-rabbitmq가 내부적으로 처리한다. NIO를 사용하여 블로킹 없이 발행한다.
 	 *
-	 * @param connectionFactory RabbitMQ 연결 팩토리
-	 * @param messageConverter 메시지 변환기
-	 * @return 설정된 RabbitTemplate
+	 * @return reactor-rabbitmq Sender 인스턴스
 	 */
 	@Bean
-	public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory,
-		MessageConverter messageConverter) {
-		RabbitTemplate template = new RabbitTemplate(connectionFactory);
-		template.setMessageConverter(messageConverter);
+	public Sender reactorRabbitSender() {
+        com.rabbitmq.client.ConnectionFactory connectionFactory = 
+            new com.rabbitmq.client.ConnectionFactory();
+        connectionFactory.setHost(host);
+        connectionFactory.setPort(port);
+        connectionFactory.setUsername(username);
+        connectionFactory.setPassword(password);
+        connectionFactory.useNio();  // 논블로킹 I/O 활성화
 
-		// 메시지가 라우팅되지 않으면 예외 발생
-		template.setMandatory(true);
+        SenderOptions senderOptions = new SenderOptions()
+            .connectionFactory(connectionFactory)
+            .resourceManagementScheduler(reactor.core.scheduler.Schedulers.boundedElastic());
 
-		// 발행 확인 콜백 설정
-		template.setConfirmCallback((correlationData, ack, cause) -> {
-			if (!ack) {
-				log.error("메시지 발행 실패: {}", cause);
-			}
-		});
+        this.sender = RabbitFlux.createSender(senderOptions);
+        log.info("Reactor RabbitMQ Sender 초기화 완료 (host: {}:{}, NIO)", host, port);
+        
+        return this.sender;
+    }
 
-		// 반환된 메시지 처리 콜백 설정 (라우팅 실패 시)
-		template.setReturnsCallback(returned -> {
-			log.error("메시지 라우팅 실패 - Exchange: {}, RoutingKey: {}, ReplyText: {}",
-				returned.getExchange(), returned.getRoutingKey(), returned.getReplyText());
-		});
-
-		return template;
-	}
+	/**
+	 * 애플리케이션 종료 시 Sender 리소스를 정리한다.
+	 *
+	 * <p>Sender가 null이 아닐 때만 close()를 호출하여 연결을 닫는다.
+	 */
+	@PreDestroy
+	public void cleanup() {
+        if (sender != null) {
+            sender.close();
+            log.info("Reactor RabbitMQ Sender 종료");
+        }
+    }
 }
