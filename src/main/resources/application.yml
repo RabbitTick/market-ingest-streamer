@@ -5,7 +5,9 @@ spring:
   application:
     name: market-ingest-streamer
   config:
-    import: classpath:upbit-markets.yml
+    import:
+      - classpath:upbit-markets.yml
+      - classpath:upbit-markets-fetched.yml
 
   rabbitmq:
     host: localhost
@@ -16,7 +18,7 @@ spring:
 upbit:
   websocket:
     uri: wss://api.upbit.com/websocket/v1
-    environment: development
+    environment: fetched
     data-types:
       ticker:
         enabled: true

@@ -1,0 +1,107 @@
+markets:
+  krw:
+    fetched:
+      - KRW-0G
+      - KRW-1INCH
+      - KRW-2Z
+      - KRW-A
+      - KRW-AAVE
+      - KRW-ADA
+      - KRW-AERGO
+      - KRW-AERO
+      - KRW-AGLD
+      - KRW-AHT # 10개
+      - KRW-AKT
+      - KRW-ALGO
+      - KRW-ALT
+      - KRW-ANIME
+      - KRW-ANKR
+      - KRW-API3
+      - KRW-APT
+      - KRW-AQT
+      - KRW-ARB
+      - KRW-ARDR # 20개
+      - KRW-ARK
+      - KRW-ARKM
+      - KRW-ASTR
+      - KRW-ATH
+      - KRW-ATOM
+      - KRW-AUCTION
+      - KRW-AVAX
+      - KRW-AVNT
+      - KRW-AWE
+      - KRW-AXL # 30개
+      - KRW-AXS
+      - KRW-AZTEC
+      - KRW-BARD
+      - KRW-BAT
+      - KRW-BCH
+      - KRW-BEAM
+      - KRW-BERA
+      - KRW-BIGTIME
+      - KRW-BIO
+      - KRW-BIRB # 40개
+      - KRW-BLAST
+      - KRW-BLUR
+      - KRW-BONK
+      - KRW-BORA
+      - KRW-BOUNTY
+      - KRW-BREV
+      - KRW-BSV
+      - KRW-BTC
+      - KRW-BTT
+      - KRW-CARV # 50개
+      - KRW-CBK
+      - KRW-CELO
+      - KRW-CHZ
+      - KRW-CKB
+      - KRW-COMP
+      - KRW-COW
+      - KRW-CPOOL
+      - KRW-CRO
+      - KRW-CTC
+      - KRW-CVC # 60개
+      - KRW-CYBER
+      - KRW-DEEP
+      - KRW-DKA
+      - KRW-DOGE
+      - KRW-DOOD
+      - KRW-DOT
+      - KRW-DRIFT
+      - KRW-EGLD
+      - KRW-ELF
+      - KRW-ELSA # 70개
+      - KRW-ENA
+      - KRW-ENS
+      - KRW-ENSO
+      - KRW-ERA
+      - KRW-ETC
+      - KRW-ETH
+      - KRW-F
+      - KRW-FCT2
+      - KRW-FF
+      - KRW-FIL # 80개
+      - KRW-FLOCK
+      - KRW-FLOW
+      - KRW-FLUID
+      - KRW-G
+      - KRW-GAME2
+      - KRW-GAS
+      - KRW-GLM
+      - KRW-GMT
+      - KRW-GRT
+      - KRW-HBAR # 90개
+      - KRW-HIVE
+      - KRW-HOLO
+      - KRW-HP
+      - KRW-HUNT
+      - KRW-HYPER
+      - KRW-ICX
+      - KRW-ID
+      - KRW-IMX
+      - KRW-IN
+      - KRW-INJ # 100개
+      
+env:
+  fetched:
+    - fetched
