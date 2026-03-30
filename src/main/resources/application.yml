@@ -25,7 +25,7 @@ upbit:
       trade:
         enabled: true
       orderbook:
-        enabled: true
+        enabled: false
 
 rabbitmq:
   exchange:
