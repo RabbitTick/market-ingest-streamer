@@ -19,13 +19,17 @@ upbit:
   websocket:
     uri: wss://api.upbit.com/websocket/v1
     environment: fetched
+    market-prefixes:
+      - KRW
+      - BTC
+      - USDT
     data-types:
       ticker:
         enabled: true
       trade:
         enabled: true
       orderbook:
-        enabled: false
+        enabled: true
 
 rabbitmq:
   exchange:

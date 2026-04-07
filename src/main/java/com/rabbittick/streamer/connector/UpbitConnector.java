@@ -41,9 +41,10 @@ import reactor.util.retry.Retry;
  * <p>주요 책임:
  * <ul>
  *   <li>Upbit WebSocket 연결 생명주기 관리</li>
- *   <li>실시간 ticker 및 trade 데이터 수신 및 파싱</li>
+ *   <li>실시간 ticker, trade, orderbook 데이터 수신 및 파싱</li>
  *   <li>연결 실패 시 자동 재연결</li>
  *   <li>60초 주기 Ping/Pong 메커니즘으로 연결 유지</li>
+ *   <li>마켓코드를 100개씩 청크로 나눠 병렬 WebSocket 연결 유지</li>
  * </ul>
  *
  * <p>애플리케이션 시작 완료 후 자동으로 WebSocket 연결을 시작하며,
@@ -61,12 +62,19 @@ public class UpbitConnector implements DisposableBean {
 
 	private static final URI UPBIT_WEBSOCKET_URI = URI.create("wss://api.upbit.com/websocket/v1");
 	private static final Duration PING_INTERVAL = Duration.ofSeconds(60);
+
+	/** Upbit WebSocket 연결당 최대 구독 가능 마켓코드 수 */
+	private static final int MAX_MARKETS_PER_CONNECTION = 100;
     
 	/** 블로킹 처리 시 동시에 구독할 내부 Mono 개수 상한 (boundedElastic 스레드 풀 사용). */
 	private static final int PROCESSING_CONCURRENCY = 32;
 
+	/** 구독할 마켓 prefix 목록 (KRW, BTC, USDT 등) */
+	@Value("${upbit.websocket.market-prefixes:KRW}")
+	private List<String> marketPrefixes;
+
 	/**
-	 * 사용할 마켓코드 환경 설정 (development, production, full)
+	 * 사용할 마켓코드 환경 설정 (development, production, full, fetched)
 	 */
 	@Value("${upbit.websocket.environment:development}")
 	private String marketEnvironment;
@@ -111,12 +119,12 @@ public class UpbitConnector implements DisposableBean {
         log.debug("설정 로드 확인 - tickerEnabled: {}, tradeEnabled: {}, orderbookEnabled: {}",
             tickerEnabled, tradeEnabled, orderbookEnabled);
         List<String> marketCodes = loadMarketCodes();
-        log.info("애플리케이션 준비 완료, {} 환경으로 {} 개 마켓코드 WebSocket 연결을 시작합니다.",
-                marketEnvironment, marketCodes.size());
+        int chunkCount = (int) Math.ceil((double) marketCodes.size() / MAX_MARKETS_PER_CONNECTION);
+        log.info("애플리케이션 준비 완료, {} 환경으로 {} 개 마켓코드 → {} 개 WebSocket 연결을 시작합니다.",
+            marketEnvironment, marketCodes.size(), chunkCount);
         log.info("활성화된 데이터 타입 - Ticker: {}, Trade: {}, OrderBook: {}",
             tickerEnabled, tradeEnabled, orderbookEnabled);
-        log.debug("구독할 마켓코드: {}", marketCodes);
-        connectToUpbit();
+        connectToUpbit(marketCodes);
     }
 
 	/**
@@ -127,13 +135,15 @@ public class UpbitConnector implements DisposableBean {
 	 */
 	private List<String> loadMarketCodes() {
 		List<String> marketCodes = new ArrayList<>();
-		List<String> enabledTiers = getEnabledTiers();
 
-		for (String tier : enabledTiers) {
-			List<String> tierMarkets = loadTierMarkets(tier);
-			if (!tierMarkets.isEmpty()) {
-				marketCodes.addAll(tierMarkets);
-				log.debug("티어 '{}' 마켓코드 {} 개 추가: {}", tier, tierMarkets.size(), tierMarkets);
+		for (String prefix : marketPrefixes) {
+			List<String> enabledTiers = getEnabledTiers();
+			for (String tier : enabledTiers) {
+				List<String> tierMarkets = loadTierMarkets(prefix.toLowerCase(), tier);
+				if (!tierMarkets.isEmpty()) {
+					marketCodes.addAll(tierMarkets);
+					log.debug("마켓 '{}' 티어 '{}' 마켓코드 {}개 추가", prefix, tier, tierMarkets.size());
+				}
 			}
 		}
 
@@ -142,21 +152,23 @@ public class UpbitConnector implements DisposableBean {
 			log.warn("설정에서 마켓코드를 로드할 수 없어 기본값 사용: {}", marketCodes);
 		}
 
+		log.info("전체 마켓코드 {}개 로드 완료 (prefix: {})", marketCodes.size(), marketPrefixes);
 		return marketCodes;
 	}
 
 	/**
 	 * Environment를 통해 특정 티어의 마켓코드를 동적으로 로드한다.
 	 *
+	 * @param marketPrefix 마켓 prefix (krw, btc, usdt)
 	 * @param tier 로드할 티어 (tier1, tier2, tier3)
 	 * @return 해당 티어의 마켓코드 목록
 	 */
-	private List<String> loadTierMarkets(String tier) {
+	private List<String> loadTierMarkets(String marketPrefix, String tier) {
 		List<String> markets = new ArrayList<>();
 		int index = 0;
 
 		while (true) {
-			String propertyKey = String.format("markets.krw.%s[%d]", tier, index);
+			String propertyKey = String.format("markets.%s.%s[%d]", marketPrefix, tier, index);
 			String market = env.getProperty(propertyKey);
 
 			if (market == null) {
@@ -167,7 +179,7 @@ public class UpbitConnector implements DisposableBean {
 			index++;
 		}
 
-		log.debug("티어 '{}' 로드 완료: {} 개 마켓코드", tier, markets.size());
+		log.debug("마켓 '{}' 티어 '{}' 로드 완료: {} 개 마켓코드", marketPrefix, tier, markets.size());
 		return markets;
 	}
 
@@ -208,19 +220,32 @@ public class UpbitConnector implements DisposableBean {
 	 * <p>연결 실패 시 지수 백오프 방식으로 자동 재연결을 시도한다.
 	 * 최대 백오프 시간은 1분으로 제한된다.
 	 */
-	private void connectToUpbit() {
-		this.connectionDisposable = webSocketClient
-			.execute(UPBIT_WEBSOCKET_URI, this::handleWebSocketSession)
-			.retryWhen(Retry.backoff(Long.MAX_VALUE, Duration.ofSeconds(5))
-				.maxBackoff(Duration.ofMinutes(1))
-				.doBeforeRetry(retrySignal ->
-					log.warn("Upbit WebSocket 연결 재시도 중... (시도 횟수: {})",
-						retrySignal.totalRetries() + 1)))
+	private void connectToUpbit(List<String> marketCodes) {
+		List<List<String>> chunks = partition(marketCodes, MAX_MARKETS_PER_CONNECTION);
+		log.info("총 {} 개 청크로 병렬 연결 시작", chunks.size());
+
+		this.connectionDisposable = Flux.fromIterable(chunks)
+			.flatMap(chunk -> webSocketClient
+				.execute(UPBIT_WEBSOCKET_URI, session -> handleWebSocketSession(session, chunk))
+				.retryWhen(Retry.backoff(Long.MAX_VALUE, Duration.ofSeconds(5))
+					.maxBackoff(Duration.ofMinutes(1))
+					.doBeforeRetry(retrySignal ->
+						log.warn("WebSocket 연결 재시도 중 (마켓코드 {}개, 시도: {})",
+							chunk.size(), retrySignal.totalRetries() + 1)))
+				.doOnError(error -> log.error("WebSocket 연결 복구 불가능한 오류 (마켓코드 {}개)", chunk.size(), error)))
 			.subscribe(
 				null,
-				error -> log.error("Upbit WebSocket 연결에 복구 불가능한 오류 발생", error),
-				() -> log.info("Upbit WebSocket 연결이 정상적으로 종료되었습니다.")
+				error -> log.error("전체 WebSocket 연결에 복구 불가능한 오류 발생", error),
+				() -> log.info("전체 WebSocket 연결이 정상적으로 종료되었습니다.")
 			);
+	}
+
+	private <T> List<List<T>> partition(List<T> list, int chunkSize) {
+		List<List<T>> chunks = new ArrayList<>();
+		for (int i = 0; i < list.size(); i += chunkSize) {
+			chunks.add(list.subList(i, Math.min(i + chunkSize, list.size())));
+		}
+		return chunks;
 	}
 
 	/**
@@ -228,13 +253,13 @@ public class UpbitConnector implements DisposableBean {
 	 * 구독 메시지 전송, Ping/Pong 메커니즘, 데이터 수신을 담당한다.
 	 *
 	 * @param session WebSocket 세션
+	 * @param marketCodes 구독할 마켓코드 목록
 	 * @return 세션 처리 완료를 나타내는 Mono
 	 */
-	private Mono<Void> handleWebSocketSession(WebSocketSession session) {
-		log.info("Upbit WebSocket 연결 성공, 데이터 구독을 시작합니다.");
+	private Mono<Void> handleWebSocketSession(WebSocketSession session, List<String> marketCodes) {
+		log.info("Upbit WebSocket 연결 성공 (마켓코드 {}개), 데이터 구독을 시작합니다.", marketCodes.size());
 
-		// 구독 메시지 전송
-		Mono<Void> sendSubscription = sendSubscriptionMessage(session);
+		Mono<Void> sendSubscription = sendSubscriptionMessage(session, marketCodes);
 
 		// 60초 주기 Ping 메시지 전송
 		Mono<Void> keepAlive = sendPeriodicPing(session);
@@ -250,12 +275,13 @@ public class UpbitConnector implements DisposableBean {
 	 * Upbit WebSocket에 데이터 구독 메시지를 전송한다.
 	 *
 	 * @param session WebSocket 세션
+	 * @param marketCodes 구독할 마켓코드 목록
 	 * @return 메시지 전송 완료를 나타내는 Mono
 	 */
-	private Mono<Void> sendSubscriptionMessage(WebSocketSession session) {
+	private Mono<Void> sendSubscriptionMessage(WebSocketSession session, List<String> marketCodes) {
 		try {
-			String subscriptionMessage = createSubscriptionMessage();
-			log.debug("구독 메시지 전송: {}", subscriptionMessage);
+			String subscriptionMessage = createSubscriptionMessage(marketCodes);
+			log.debug("구독 메시지 전송 (마켓코드 {}개)", marketCodes.size());
 
 			return session.send(Mono.just(session.textMessage(subscriptionMessage)));
 		} catch (Exception e) {
@@ -296,11 +322,13 @@ public class UpbitConnector implements DisposableBean {
         return session.receive()
                 .map(WebSocketMessage::getPayloadAsText)
                 .flatMap(jsonMessage ->
-                                parseMessage(jsonMessage).subscribeOn(Schedulers.boundedElastic()),
+								parseMessage(jsonMessage)
+									.subscribeOn(Schedulers.boundedElastic())
+									.onErrorResume(error -> {
+										log.warn("메시지 처리 실패, 다음 메시지 계속 처리: {}", error.getMessage());
+										return Mono.empty();
+									}),
                         PROCESSING_CONCURRENCY)
-                .doOnError(error -> log.error("메시지 처리 중 오류 발생", error))
-                .onErrorContinue((error, obj) ->
-                        log.warn("메시지 처리 실패, 다음 메시지 계속 처리: {}", error.getMessage()))
                 .then();
     }
 
@@ -314,7 +342,6 @@ public class UpbitConnector implements DisposableBean {
         log.debug("WebSocket 메시지 수신: {}", jsonMessage);
 
         try {
-            // 먼저 메시지에서 type 필드를 확인
             JsonNode messageNode = objectMapper.readTree(jsonMessage);
             JsonNode typeNode = messageNode.get("ty");
 
@@ -498,18 +525,14 @@ public class UpbitConnector implements DisposableBean {
      *   <li>orderbook: 호가 정보</li>
      * </ul>
      *
+     * @param marketCodes 구독할 마켓코드 목록
      * @return JSON 형식의 구독 메시지
      * @throws JsonProcessingException JSON 직렬화 실패 시
      * @throws IllegalStateException 활성화된 데이터 타입이 없는 경우
      */
-    private String createSubscriptionMessage() throws JsonProcessingException {
-        List<String> marketCodes = loadMarketCodes();
+    private String createSubscriptionMessage(List<String> marketCodes) throws JsonProcessingException {
         List<Object> request = new ArrayList<>();
-
-        // Ticket 정보
         request.add(new Ticket(UUID.randomUUID().toString()));
-
-        // 활성화된 데이터 타입별로 구독 요청 추가
         if (tickerEnabled) {
             request.add(new Type("ticker", marketCodes));
             log.info("Ticker 구독 활성화: {} 개 마켓코드", marketCodes.size());
@@ -525,12 +548,9 @@ public class UpbitConnector implements DisposableBean {
             log.info("OrderBook 구독 활성화: {} 개 마켓코드", marketCodes.size());
         }
 
-        // 구독할 데이터 타입이 없는 경우 예외 발생
         if (!tickerEnabled && !tradeEnabled && !orderbookEnabled) {
             throw new IllegalStateException("최소 하나의 데이터 타입은 활성화되어야 합니다");
         }
-
-        // Format 정보
         request.add(new Format("SIMPLE"));
 
 		return objectMapper.writeValueAsString(request);
