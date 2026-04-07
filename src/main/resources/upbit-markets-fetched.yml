@@ -10,7 +10,7 @@ markets:
       - KRW-AERGO
       - KRW-AERO
       - KRW-AGLD
-      - KRW-AHT # 10개
+      - KRW-AHT
       - KRW-AKT
       - KRW-ALGO
       - KRW-ALT
@@ -20,7 +20,7 @@ markets:
       - KRW-APT
       - KRW-AQT
       - KRW-ARB
-      - KRW-ARDR # 20개
+      - KRW-ARDR
       - KRW-ARK
       - KRW-ARKM
       - KRW-ASTR
@@ -30,7 +30,7 @@ markets:
       - KRW-AVAX
       - KRW-AVNT
       - KRW-AWE
-      - KRW-AXL # 30개
+      - KRW-AXL
       - KRW-AXS
       - KRW-AZTEC
       - KRW-BARD
@@ -40,7 +40,7 @@ markets:
       - KRW-BERA
       - KRW-BIGTIME
       - KRW-BIO
-      - KRW-BIRB # 40개
+      - KRW-BIRB
       - KRW-BLAST
       - KRW-BLUR
       - KRW-BONK
@@ -50,9 +50,10 @@ markets:
       - KRW-BSV
       - KRW-BTC
       - KRW-BTT
-      - KRW-CARV # 50개
+      - KRW-CARV
       - KRW-CBK
       - KRW-CELO
+      - KRW-CFG
       - KRW-CHZ
       - KRW-CKB
       - KRW-COMP
@@ -60,7 +61,7 @@ markets:
       - KRW-CPOOL
       - KRW-CRO
       - KRW-CTC
-      - KRW-CVC # 60개
+      - KRW-CVC
       - KRW-CYBER
       - KRW-DEEP
       - KRW-DKA
@@ -68,21 +69,23 @@ markets:
       - KRW-DOOD
       - KRW-DOT
       - KRW-DRIFT
+      - KRW-EDGE
       - KRW-EGLD
       - KRW-ELF
-      - KRW-ELSA # 70개
+      - KRW-ELSA
       - KRW-ENA
       - KRW-ENS
       - KRW-ENSO
       - KRW-ERA
+      - KRW-ESP
       - KRW-ETC
       - KRW-ETH
+      - KRW-ETHFI
       - KRW-F
       - KRW-FCT2
       - KRW-FF
-      - KRW-FIL # 80개
+      - KRW-FIL
       - KRW-FLOCK
-      - KRW-FLOW
       - KRW-FLUID
       - KRW-G
       - KRW-GAME2
@@ -90,18 +93,624 @@ markets:
       - KRW-GLM
       - KRW-GMT
       - KRW-GRT
-      - KRW-HBAR # 90개
+      - KRW-HBAR
       - KRW-HIVE
       - KRW-HOLO
       - KRW-HP
       - KRW-HUNT
       - KRW-HYPER
+      - KRW-ICP
       - KRW-ICX
       - KRW-ID
       - KRW-IMX
       - KRW-IN
-      - KRW-INJ # 100개
-      
+      - KRW-INJ
+      - KRW-IOST
+      - KRW-IOTA
+      - KRW-IP
+      - KRW-IQ
+      - KRW-JST
+      - KRW-JTO
+      - KRW-JUP
+      - KRW-KAITO
+      - KRW-KAT
+      - KRW-KAVA
+      - KRW-KERNEL
+      - KRW-KITE
+      - KRW-KNC
+      - KRW-LA
+      - KRW-LAYER
+      - KRW-LINEA
+      - KRW-LINK
+      - KRW-LPT
+      - KRW-LSK
+      - KRW-MANA
+      - KRW-MANTRA
+      - KRW-MASK
+      - KRW-MBL
+      - KRW-ME
+      - KRW-MED
+      - KRW-MET2
+      - KRW-META
+      - KRW-MEW
+      - KRW-MINA
+      - KRW-MIRA
+      - KRW-MLK
+      - KRW-MMT
+      - KRW-MNT
+      - KRW-MOC
+      - KRW-MOCA
+      - KRW-MON
+      - KRW-MOODENG
+      - KRW-MOVE
+      - KRW-MTL
+      - KRW-MVL
+      - KRW-NEAR
+      - KRW-NEO
+      - KRW-NEWT
+      - KRW-NXPC
+      - KRW-ONDO
+      - KRW-ONG
+      - KRW-ONT
+      - KRW-OP
+      - KRW-OPEN
+      - KRW-ORBS
+      - KRW-ORCA
+      - KRW-ORDER
+      - KRW-PENDLE
+      - KRW-PENGU
+      - KRW-PEPE
+      - KRW-PLUME
+      - KRW-POKT
+      - KRW-POL
+      - KRW-POLYX
+      - KRW-POWR
+      - KRW-PROVE
+      - KRW-PUMP
+      - KRW-PUNDIX
+      - KRW-PYTH
+      - KRW-QKC
+      - KRW-QTUM
+      - KRW-RAY
+      - KRW-RED
+      - KRW-RENDER
+      - KRW-RVN
+      - KRW-SAFE
+      - KRW-SAHARA
+      - KRW-SAND
+      - KRW-SC
+      - KRW-SEI
+      - KRW-SENT
+      - KRW-SHIB
+      - KRW-SIGN
+      - KRW-SKR
+      - KRW-SKY
+      - KRW-SNT
+      - KRW-SOL
+      - KRW-SOMI
+      - KRW-SONIC
+      - KRW-SOPH
+      - KRW-STEEM
+      - KRW-STORJ
+      - KRW-STRAX
+      - KRW-STX
+      - KRW-SUI
+      - KRW-SUN
+      - KRW-SUPER
+      - KRW-SYRUP
+      - KRW-T
+      - KRW-TAIKO
+      - KRW-TAO
+      - KRW-TFUEL
+      - KRW-THETA
+      - KRW-TIA
+      - KRW-TOKAMAK
+      - KRW-TOSHI
+      - KRW-TREE
+      - KRW-TRUMP
+      - KRW-TRUST
+      - KRW-TRX
+      - KRW-TT
+      - KRW-UNI
+      - KRW-USD1
+      - KRW-USDC
+      - KRW-USDE
+      - KRW-USDS
+      - KRW-USDT
+      - KRW-VANA
+      - KRW-VET
+      - KRW-VIRTUAL
+      - KRW-VTHO
+      - KRW-W
+      - KRW-WAL
+      - KRW-WAVES
+      - KRW-WAXP
+      - KRW-WCT
+      - KRW-WET
+      - KRW-WLD
+      - KRW-WLFI
+      - KRW-XAUT
+      - KRW-XEC
+      - KRW-XLM
+      - KRW-XPL
+      - KRW-XRP
+      - KRW-XTZ
+      - KRW-YGG
+      - KRW-ZBT
+      - KRW-ZETA
+      - KRW-ZIL
+      - KRW-ZK
+      - KRW-ZKC
+      - KRW-ZKP
+      - KRW-ZORA
+      - KRW-ZRO
+      - KRW-ZRX
+
+  btc:
+    fetched:
+      - BTC-0G
+      - BTC-1INCH
+      - BTC-2Z
+      - BTC-A
+      - BTC-AAVE
+      - BTC-ACM
+      - BTC-ACS
+      - BTC-ADA
+      - BTC-AERGO
+      - BTC-AERO
+      - BTC-AFC
+      - BTC-AGLD
+      - BTC-AHT
+      - BTC-AKT
+      - BTC-ALGO
+      - BTC-ALT
+      - BTC-ANIME
+      - BTC-ANKR
+      - BTC-APE
+      - BTC-API3
+      - BTC-APT
+      - BTC-AQT
+      - BTC-ARB
+      - BTC-ARDR
+      - BTC-ARK
+      - BTC-ARKM
+      - BTC-ARPA
+      - BTC-ASTR
+      - BTC-ATH
+      - BTC-ATM
+      - BTC-ATOM
+      - BTC-AUCTION
+      - BTC-AUDIO
+      - BTC-AVAX
+      - BTC-AVNT
+      - BTC-AWE
+      - BTC-AXL
+      - BTC-AXS
+      - BTC-AZTEC
+      - BTC-BABY
+      - BTC-BAR
+      - BTC-BARD
+      - BTC-BAT
+      - BTC-BCH
+      - BTC-BEAM
+      - BTC-BERA
+      - BTC-BFC
+      - BTC-BIGTIME
+      - BTC-BIO
+      - BTC-BIRB
+      - BTC-BLAST
+      - BTC-BLUR
+      - BTC-BNT
+      - BTC-BORA
+      - BTC-BOUNTY
+      - BTC-BREV
+      - BTC-BSV
+      - BTC-CARV
+      - BTC-CBK
+      - BTC-CELO
+      - BTC-CFG
+      - BTC-CHR
+      - BTC-CHZ
+      - BTC-CITY
+      - BTC-CKB
+      - BTC-COMP
+      - BTC-COW
+      - BTC-CPOOL
+      - BTC-CRO
+      - BTC-CRV
+      - BTC-CTC
+      - BTC-CTSI
+      - BTC-CVC
+      - BTC-CYBER
+      - BTC-DEEP
+      - BTC-DGB
+      - BTC-DKA
+      - BTC-DNT
+      - BTC-DOGE
+      - BTC-DOT
+      - BTC-DRIFT
+      - BTC-EDGE
+      - BTC-EGLD
+      - BTC-ELF
+      - BTC-ELSA
+      - BTC-ENA
+      - BTC-ENJ
+      - BTC-ENS
+      - BTC-ENSO
+      - BTC-ERA
+      - BTC-ESP
+      - BTC-ETC
+      - BTC-ETH
+      - BTC-ETHFI
+      - BTC-EUL
+      - BTC-FCT2
+      - BTC-FIL
+      - BTC-FLOCK
+      - BTC-FLUID
+      - BTC-FORT
+      - BTC-G
+      - BTC-GAME2
+      - BTC-GAS
+      - BTC-GLM
+      - BTC-GLMR
+      - BTC-GMT
+      - BTC-GRT
+      - BTC-GTC
+      - BTC-HAEDAL
+      - BTC-HBD
+      - BTC-HIVE
+      - BTC-HOLO
+      - BTC-HP
+      - BTC-HUMA
+      - BTC-HUNT
+      - BTC-HYPER
+      - BTC-ICP
+      - BTC-ID
+      - BTC-IMX
+      - BTC-IN
+      - BTC-INIT
+      - BTC-INJ
+      - BTC-INTER
+      - BTC-IO
+      - BTC-IOST
+      - BTC-IOTX
+      - BTC-IP
+      - BTC-IQ
+      - BTC-JASMY
+      - BTC-JST
+      - BTC-JTO
+      - BTC-JUP
+      - BTC-JUV
+      - BTC-KAITO
+      - BTC-KAT
+      - BTC-KAVA
+      - BTC-KERNEL
+      - BTC-KITE
+      - BTC-LA
+      - BTC-LAYER
+      - BTC-LINEA
+      - BTC-LINK
+      - BTC-LPT
+      - BTC-LSK
+      - BTC-LWA
+      - BTC-MAGIC
+      - BTC-MANA
+      - BTC-MANTRA
+      - BTC-MASK
+      - BTC-ME
+      - BTC-MED
+      - BTC-MET2
+      - BTC-META
+      - BTC-MEW
+      - BTC-MINA
+      - BTC-MIRA
+      - BTC-MLK
+      - BTC-MMT
+      - BTC-MNT
+      - BTC-MOC
+      - BTC-MOCA
+      - BTC-MON
+      - BTC-MOODENG
+      - BTC-MOVE
+      - BTC-MTL
+      - BTC-MVL
+      - BTC-NAP
+      - BTC-NCT
+      - BTC-NEAR
+      - BTC-NEO
+      - BTC-NEWT
+      - BTC-NKN
+      - BTC-NMR
+      - BTC-NXPC
+      - BTC-OBSR
+      - BTC-OCEAN
+      - BTC-OGN
+      - BTC-ONDO
+      - BTC-OP
+      - BTC-OPEN
+      - BTC-ORBS
+      - BTC-ORCA
+      - BTC-ORDER
+      - BTC-OXT
+      - BTC-PENDLE
+      - BTC-PENGU
+      - BTC-PLUME
+      - BTC-POKT
+      - BTC-POL
+      - BTC-POLYX
+      - BTC-POWR
+      - BTC-PROM
+      - BTC-PROVE
+      - BTC-PSG
+      - BTC-PUFFER
+      - BTC-PUNDIX
+      - BTC-PYTH
+      - BTC-QTUM
+      - BTC-RAD
+      - BTC-RAY
+      - BTC-RED
+      - BTC-REI
+      - BTC-RENDER
+      - BTC-RESOLV
+      - BTC-RLC
+      - BTC-RSR
+      - BTC-RVN
+      - BTC-SAFE
+      - BTC-SAHARA
+      - BTC-SAND
+      - BTC-SC
+      - BTC-SCR
+      - BTC-SEI
+      - BTC-SENT
+      - BTC-SHELL
+      - BTC-SIGN
+      - BTC-SKR
+      - BTC-SKY
+      - BTC-SNT
+      - BTC-SNX
+      - BTC-SOL
+      - BTC-SOMI
+      - BTC-SONIC
+      - BTC-SOON
+      - BTC-SOPH
+      - BTC-SPK
+      - BTC-SPURS
+      - BTC-STEEM
+      - BTC-STORJ
+      - BTC-STRAX
+      - BTC-STX
+      - BTC-SUI
+      - BTC-SUN
+      - BTC-SUPER
+      - BTC-SWELL
+      - BTC-SYRUP
+      - BTC-T
+      - BTC-TAIKO
+      - BTC-TAO
+      - BTC-TIA
+      - BTC-TOKAMAK
+      - BTC-TREE
+      - BTC-TRUMP
+      - BTC-TRUST
+      - BTC-TRX
+      - BTC-TT
+      - BTC-TUSD
+      - BTC-UNI
+      - BTC-USD1
+      - BTC-USDC
+      - BTC-USDE
+      - BTC-USDP
+      - BTC-USDS
+      - BTC-USDT
+      - BTC-VAL
+      - BTC-VANA
+      - BTC-VET
+      - BTC-VIRTUAL
+      - BTC-W
+      - BTC-WAL
+      - BTC-WAVES
+      - BTC-WAXP
+      - BTC-WCT
+      - BTC-WET
+      - BTC-WLD
+      - BTC-WLFI
+      - BTC-XAUT
+      - BTC-XLM
+      - BTC-XPL
+      - BTC-XRP
+      - BTC-XTZ
+      - BTC-YB
+      - BTC-YGG
+      - BTC-ZBT
+      - BTC-ZETA
+      - BTC-ZIL
+      - BTC-ZK
+      - BTC-ZKC
+      - BTC-ZKP
+      - BTC-ZORA
+      - BTC-ZRO
+      - BTC-ZRX
+
+  usdt:
+    fetched:
+      - USDT-0G
+      - USDT-2Z
+      - USDT-ACS
+      - USDT-ADA
+      - USDT-AERO
+      - USDT-AGLD
+      - USDT-AHT
+      - USDT-AKT
+      - USDT-ALT
+      - USDT-ANIME
+      - USDT-API3
+      - USDT-ARKM
+      - USDT-ARPA
+      - USDT-ASTR
+      - USDT-AVNT
+      - USDT-AXL
+      - USDT-AZTEC
+      - USDT-B3
+      - USDT-BABY
+      - USDT-BARD
+      - USDT-BAT
+      - USDT-BCH
+      - USDT-BEAM
+      - USDT-BERA
+      - USDT-BIGTIME
+      - USDT-BIO
+      - USDT-BIRB
+      - USDT-BLAST
+      - USDT-BNT
+      - USDT-BONK
+      - USDT-BRETT
+      - USDT-BREV
+      - USDT-BTC
+      - USDT-CARV
+      - USDT-CFG
+      - USDT-CKB
+      - USDT-COW
+      - USDT-CPOOL
+      - USDT-CYBER
+      - USDT-DEEP
+      - USDT-DGB
+      - USDT-DOGE
+      - USDT-DOOD
+      - USDT-DRIFT
+      - USDT-EDGE
+      - USDT-EGLD
+      - USDT-ELSA
+      - USDT-ENA
+      - USDT-ENSO
+      - USDT-EPT
+      - USDT-ERA
+      - USDT-ESP
+      - USDT-ETC
+      - USDT-ETH
+      - USDT-ETHFI
+      - USDT-EUL
+      - USDT-F
+      - USDT-FF
+      - USDT-FIL
+      - USDT-FLOCK
+      - USDT-FLUID
+      - USDT-FORT
+      - USDT-GAS
+      - USDT-HAEDAL
+      - USDT-HOLO
+      - USDT-HUMA
+      - USDT-HYPER
+      - USDT-ICP
+      - USDT-IN
+      - USDT-INIT
+      - USDT-INJ
+      - USDT-IO
+      - USDT-IP
+      - USDT-JASMY
+      - USDT-JTO
+      - USDT-JUP
+      - USDT-KAITO
+      - USDT-KAT
+      - USDT-KERNEL
+      - USDT-KITE
+      - USDT-LA
+      - USDT-LAYER
+      - USDT-LINEA
+      - USDT-LPT
+      - USDT-LWA
+      - USDT-MANTRA
+      - USDT-ME
+      - USDT-MET2
+      - USDT-MEW
+      - USDT-MIRA
+      - USDT-MMT
+      - USDT-MNT
+      - USDT-MOCA
+      - USDT-MON
+      - USDT-MOODENG
+      - USDT-MOVE
+      - USDT-NCT
+      - USDT-NEAR
+      - USDT-NEO
+      - USDT-NEWT
+      - USDT-NXPC
+      - USDT-OBSR
+      - USDT-ONDO
+      - USDT-OP
+      - USDT-OPEN
+      - USDT-ORCA
+      - USDT-ORDER
+      - USDT-OXT
+      - USDT-PENGU
+      - USDT-PEPE
+      - USDT-PLUME
+      - USDT-POKT
+      - USDT-PROVE
+      - USDT-PUFFER
+      - USDT-PUMP
+      - USDT-RAD
+      - USDT-RAY
+      - USDT-RED
+      - USDT-RENDER
+      - USDT-RESOLV
+      - USDT-RVN
+      - USDT-SAFE
+      - USDT-SAHARA
+      - USDT-SC
+      - USDT-SCR
+      - USDT-SENT
+      - USDT-SHELL
+      - USDT-SIGN
+      - USDT-SKR
+      - USDT-SKY
+      - USDT-SOL
+      - USDT-SOMI
+      - USDT-SONIC
+      - USDT-SOON
+      - USDT-SOPH
+      - USDT-SPK
+      - USDT-SUN
+      - USDT-SUPER
+      - USDT-SWELL
+      - USDT-SYRUP
+      - USDT-TAIKO
+      - USDT-TAO
+      - USDT-TIA
+      - USDT-TOSHI
+      - USDT-TREE
+      - USDT-TRUMP
+      - USDT-TRUST
+      - USDT-TRX
+      - USDT-TUSD
+      - USDT-UNI
+      - USDT-USD1
+      - USDT-USDC
+      - USDT-USDE
+      - USDT-USDS
+      - USDT-VANA
+      - USDT-VIRTUAL
+      - USDT-VTHO
+      - USDT-W
+      - USDT-WAL
+      - USDT-WCT
+      - USDT-WET
+      - USDT-WLD
+      - USDT-WLFI
+      - USDT-XAUT
+      - USDT-XLM
+      - USDT-XPL
+      - USDT-XRP
+      - USDT-YB
+      - USDT-YGG
+      - USDT-ZBT
+      - USDT-ZETA
+      - USDT-ZK
+      - USDT-ZKC
+      - USDT-ZKP
+      - USDT-ZORA
+      - USDT-ZRO
+      - USDT-ZRX
+
 env:
   fetched:
     - fetched
