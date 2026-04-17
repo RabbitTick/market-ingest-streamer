@@ -31,6 +31,24 @@ upbit:
       orderbook:
         enabled: true
 
+exchanges:
+  configs:
+    upbit:
+      enabled: true
+      websocket-uri: wss://api.upbit.com/websocket/v1
+      ping-interval-seconds: 60
+      max-markets-per-connection: 100
+      processing-concurrency: 32
+      environment: fetched
+      market-prefixes:
+        - KRW
+        - BTC
+        - USDT
+      data-types:
+        ticker: true
+        trade: true
+        orderbook: true
+
 rabbitmq:
   exchange:
     market-data: market-data.exchange
