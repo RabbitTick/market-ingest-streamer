@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.socket.WebSocketSession;
@@ -58,7 +59,7 @@ public class UpbitConnector extends AbstractExchangeConnector {
      */
     public UpbitConnector(WebSocketClient webSocketClient,
                           MarketDataService marketDataService,
-                          ExchangeDataConverter converter,
+                          @Qualifier("upbitDataConverter") ExchangeDataConverter converter,
                           ObjectMapper objectMapper,
                           ExchangeProperties exchangeProperties,
                           Environment env) {

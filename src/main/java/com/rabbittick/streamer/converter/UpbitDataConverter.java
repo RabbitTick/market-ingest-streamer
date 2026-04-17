@@ -33,7 +33,7 @@ import lombok.RequiredArgsConstructor;
  *   <li>OrderBook - 호가 정보</li>
  * </ul>
  */
-@Component
+@Component("upbitDataConverter")
 @RequiredArgsConstructor
 public class UpbitDataConverter implements ExchangeDataConverter {
 
