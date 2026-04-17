@@ -20,11 +20,11 @@ import reactor.core.publisher.Mono;
  * </ul>
  *
  * <p>각 거래소 구현체는 이 인터페이스를 통해 거래소별 프로토콜 차이를
- * 캡슐화하고, {@code AbstractExchangeConnector}가 제공하는 공통 연결
+ * 캡슐화하고, {@link AbstractExchangeConnector}가 제공하는 공통 연결
  * 생명주기(연결 시작, 청크 분할, Ping, 재연결) 위에서 동작한다.
  *
  * <p>새로운 거래소를 추가하려면 이 인터페이스와
- * {@code AbstractExchangeConnector}를 함께 구현한다.
+ * {@link AbstractExchangeConnector}를 함께 구현한다.
  */
 public interface ExchangeConnector {
 
@@ -69,7 +69,7 @@ public interface ExchangeConnector {
      *
      * <p>{@code ConnectorManager}가 {@code ApplicationReadyEvent} 수신 후
      * 활성화된 커넥터에 대해 호출한다. 연결 실패 시 지수 백오프 방식으로
-     * 재연결을 시도하는 것은 {@code AbstractExchangeConnector}의 공통 구현에서 처리한다.
+     * 재연결을 시도하는 것은 {@link AbstractExchangeConnector}의 공통 구현에서 처리한다.
      */
     void start();
 
@@ -102,7 +102,7 @@ public interface ExchangeConnector {
      * 구독할 마켓코드 목록을 로드한다.
      *
      * <p>설정 파일 또는 외부 API에서 마켓코드를 조회하는 방식은
-     * 구현체가 직접 정의한다. 로드된 목록은 {@code AbstractExchangeConnector}의
+     * 구현체가 직접 정의한다. 로드된 목록은 {@link AbstractExchangeConnector}의
      * 청크 분할 로직에 의해 연결당 최대 구독 수 이하로 나뉘어 처리된다.
      *
      * @return 구독할 마켓코드 목록
