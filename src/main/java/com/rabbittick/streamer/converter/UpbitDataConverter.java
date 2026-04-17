@@ -6,6 +6,8 @@ import java.util.UUID;
 
 import org.springframework.stereotype.Component;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbittick.streamer.connector.dto.upbit.UpbitOrderBookDto;
 import com.rabbittick.streamer.connector.dto.upbit.UpbitTickerDto;
 import com.rabbittick.streamer.connector.dto.upbit.UpbitTradeDto;
@@ -16,11 +18,13 @@ import com.rabbittick.streamer.global.dto.OrderBookUnitPayload;
 import com.rabbittick.streamer.global.dto.TickerPayload;
 import com.rabbittick.streamer.global.dto.TradePayload;
 
+import lombok.RequiredArgsConstructor;
+
 /**
- * Upbit 외부 API DTO를 시스템 표준 DTO로 변환하는 컨버터.
+ * Upbit WebSocket 수신 데이터를 시스템 표준 DTO로 변환하는 컨버터.
  *
- * <p>각 데이터 타입별로 명시적인 변환 메서드를 제공하여
- * 타입 안전성과 코드 가독성을 확보한다.
+ * <p>{@link ExchangeDataConverter}를 구현하여 원시 JSON 문자열을 직접 수신하고,
+ * Upbit 전용 DTO로 파싱한 후 거래소 독립적인 {@link MarketDataMessage}로 변환한다.
  *
  * <p>지원하는 데이터 타입:
  * <ul>
@@ -30,10 +34,69 @@ import com.rabbittick.streamer.global.dto.TradePayload;
  * </ul>
  */
 @Component
-public class UpbitDataConverter {
+@RequiredArgsConstructor
+public class UpbitDataConverter implements ExchangeDataConverter {
+
+    private final ObjectMapper objectMapper;
 
 	private static final String EXCHANGE_NAME = "UPBIT";
 	private static final String VERSION = "1.0";
+
+	@Override
+	public String getExchangeName() {
+		return EXCHANGE_NAME;
+	}
+
+	/**
+	 * 원시 JSON 문자열을 {@link UpbitTickerDto}로 파싱하여 표준 ticker 메시지로 변환한다.
+	 *
+	 * @param rawJson Upbit WebSocket으로부터 수신된 원시 JSON 문자열
+	 * @return 표준화된 ticker MarketDataMessage
+	 * @throws IllegalArgumentException JSON 파싱 실패 시
+	 */
+	@Override
+	public MarketDataMessage<TickerPayload> convertTicker(String rawJson) {
+		try {
+			UpbitTickerDto dto = objectMapper.readValue(rawJson, UpbitTickerDto.class);
+			return convertTickerData(dto);
+		} catch (JsonProcessingException e) {
+			throw new IllegalArgumentException("Ticker JSON 파싱 실패: " + e.getMessage(), e);
+		}
+	}
+
+	/**
+	 * 원시 JSON 문자열을 {@link UpbitTradeDto}로 파싱하여 표준 trade 메시지로 변환한다.
+	 *
+	 * @param rawJson Upbit WebSocket으로부터 수신된 원시 JSON 문자열
+	 * @return 표준화된 trade MarketDataMessage
+	 * @throws IllegalArgumentException JSON 파싱 실패 시
+	 */
+	@Override
+	public MarketDataMessage<TradePayload> convertTrade(String rawJson) {
+		try {
+			UpbitTradeDto dto = objectMapper.readValue(rawJson, UpbitTradeDto.class);
+			return convertTradeData(dto);
+		} catch (JsonProcessingException e) {
+			throw new IllegalArgumentException("Trade JSON 파싱 실패: " + e.getMessage(), e);
+		}
+	}
+
+	/**
+	 * 원시 JSON 문자열을 {@link UpbitOrderBookDto}로 파싱하여 표준 orderbook 메시지로 변환한다.
+	 *
+	 * @param rawJson Upbit WebSocket으로부터 수신된 원시 JSON 문자열
+	 * @return 표준화된 orderbook MarketDataMessage
+	 * @throws IllegalArgumentException JSON 파싱 실패 시
+	 */
+	@Override
+	public MarketDataMessage<OrderBookPayload> convertOrderBook(String rawJson) {
+		try {
+			UpbitOrderBookDto dto = objectMapper.readValue(rawJson, UpbitOrderBookDto.class);
+			return convertOrderBookData(dto);
+		} catch (JsonProcessingException e) {
+			throw new IllegalArgumentException("OrderBook JSON 파싱 실패: " + e.getMessage(), e);
+		}
+	}
 
 	/**
 	 * UpbitTickerDto를 표준 MarketDataMessage로 변환한다.
