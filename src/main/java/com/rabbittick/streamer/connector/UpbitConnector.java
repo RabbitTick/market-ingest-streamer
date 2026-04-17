@@ -8,8 +8,6 @@ import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.socket.WebSocketSession;
@@ -102,22 +100,6 @@ public class UpbitConnector extends AbstractExchangeConnector {
         super(webSocketClient, marketDataService);
         this.converter = converter;
         this.objectMapper = objectMapper;
-    }
-
-    /**
-     * Spring 애플리케이션이 완전히 준비된 후 WebSocket 연결을 시작한다.
-     *
-     * <p>Commit 4에서 {@code ConnectorManager}로 이관 예정.
-     *
-     * @param event Spring 애플리케이션 준비 완료 이벤트
-     */
-    @EventListener(ApplicationReadyEvent.class)
-    public void startWebSocketConnection(ApplicationReadyEvent event) {
-        log.debug("설정 로드 확인 - tickerEnabled: {}, tradeEnabled: {}, orderbookEnabled: {}",
-            tickerEnabled, tradeEnabled, orderbookEnabled);
-        log.info("활성화된 데이터 타입 - Ticker: {}, Trade: {}, OrderBook: {}",
-            tickerEnabled, tradeEnabled, orderbookEnabled);
-        start();
     }
 
     @Override
