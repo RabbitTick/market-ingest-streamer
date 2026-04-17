@@ -15,22 +15,6 @@ spring:
     username: guest
     password: guest
 
-upbit:
-  websocket:
-    uri: wss://api.upbit.com/websocket/v1
-    environment: fetched
-    market-prefixes:
-      - KRW
-      - BTC
-      - USDT
-    data-types:
-      ticker:
-        enabled: true
-      trade:
-        enabled: true
-      orderbook:
-        enabled: true
-
 exchanges:
   configs:
     upbit:

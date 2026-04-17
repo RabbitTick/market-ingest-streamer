@@ -6,8 +6,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.socket.WebSocketSession;
@@ -16,6 +14,7 @@ import org.springframework.web.reactive.socket.client.WebSocketClient;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rabbittick.streamer.config.ExchangeProperties;
 import com.rabbittick.streamer.converter.ExchangeDataConverter;
 import com.rabbittick.streamer.global.dto.MarketDataMessage;
 import com.rabbittick.streamer.service.MarketDataService;
@@ -42,46 +41,8 @@ public class UpbitConnector extends AbstractExchangeConnector {
 
     private final ExchangeDataConverter converter;
     private final ObjectMapper objectMapper;
-
-    private static final URI UPBIT_WEBSOCKET_URI = URI.create("wss://api.upbit.com/websocket/v1");
-    private static final Duration PING_INTERVAL = Duration.ofSeconds(60);
-
-    /** Upbit WebSocket 연결당 최대 구독 가능 마켓코드 수 */
-    private static final int MAX_MARKETS_PER_CONNECTION = 100;
-
-    /** 블로킹 처리 시 동시에 구독할 내부 Mono 개수 상한 (boundedElastic 스레드 풀 사용) */
-    private static final int PROCESSING_CONCURRENCY = 32;
-
-    /** 구독할 마켓 prefix 목록 (KRW, BTC, USDT 등) */
-    @Value("${upbit.websocket.market-prefixes:KRW}")
-    private List<String> marketPrefixes;
-
-    /**
-     * 사용할 마켓코드 환경 설정 (development, production, full, fetched)
-     */
-    @Value("${upbit.websocket.environment:development}")
-    private String marketEnvironment;
-
-    /**
-     * Ticker 데이터 수집 활성화 여부
-     */
-    @Value("${upbit.websocket.data-types.ticker.enabled:true}")
-    private boolean tickerEnabled;
-
-    /**
-     * Trade 데이터 수집 활성화 여부
-     */
-    @Value("${upbit.websocket.data-types.trade.enabled:false}")
-    private boolean tradeEnabled;
-
-    /**
-     * OrderBook 데이터 수집 활성화 여부
-     */
-    @Value("${upbit.websocket.data-types.orderbook.enabled:false}")
-    private boolean orderbookEnabled;
-
-    @Autowired
-    private Environment env;
+    private final ExchangeProperties exchangeProperties;
+    private final Environment env;
 
     /**
      * 생성자 주입.
@@ -92,14 +53,24 @@ public class UpbitConnector extends AbstractExchangeConnector {
      * @param marketDataService 시장 데이터 처리 서비스
      * @param converter Upbit DTO → 표준 DTO 변환 컨버터
      * @param objectMapper JSON 파싱용 ObjectMapper
+     * @param exchangeProperties 다중 거래소 설정 프로퍼티
+     * @param env 마켓코드 YAML 로드용 Spring Environment
      */
     public UpbitConnector(WebSocketClient webSocketClient,
                           MarketDataService marketDataService,
                           ExchangeDataConverter converter,
-                          ObjectMapper objectMapper) {
+                          ObjectMapper objectMapper,
+                          ExchangeProperties exchangeProperties,
+                          Environment env) {
         super(webSocketClient, marketDataService);
         this.converter = converter;
         this.objectMapper = objectMapper;
+        this.exchangeProperties = exchangeProperties;
+        this.env = env;
+    }
+
+    private ExchangeProperties.ExchangeConfig config() {
+        return exchangeProperties.getConfigs().get("upbit");
     }
 
     @Override
@@ -109,27 +80,27 @@ public class UpbitConnector extends AbstractExchangeConnector {
 
     @Override
     public URI getWebSocketUri() {
-        return UPBIT_WEBSOCKET_URI;
+        return config().getWebsocketUri();
     }
 
     @Override
     public Duration getPingInterval() {
-        return PING_INTERVAL;
+        return config().getPingInterval();
     }
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return config().isEnabled();
     }
 
     @Override
     protected int getMaxMarketsPerConnection() {
-        return MAX_MARKETS_PER_CONNECTION;
+        return config().getMaxMarketsPerConnection();
     }
 
     @Override
     protected int getProcessingConcurrency() {
-        return PROCESSING_CONCURRENCY;
+        return config().getProcessingConcurrency();
     }
 
     /**
@@ -178,10 +149,11 @@ public class UpbitConnector extends AbstractExchangeConnector {
             String messageType = typeNode.asText();
             log.debug("[UPBIT] 메시지 타입 확인: {}", messageType);
 
+            ExchangeProperties.DataTypesConfig dataTypes = config().getDataTypes();
             return switch (messageType) {
-                case "ticker" -> tickerEnabled ? processMessage(converter.convertTicker(rawJson)) : Mono.empty();
-                case "trade"  -> tradeEnabled  ? processMessage(converter.convertTrade(rawJson))  : Mono.empty();
-                case "orderbook" -> orderbookEnabled ? processMessage(converter.convertOrderBook(rawJson)) : Mono.empty();
+                case "ticker"    -> dataTypes.isTicker()    ? processMessage(converter.convertTicker(rawJson))    : Mono.empty();
+                case "trade"     -> dataTypes.isTrade()     ? processMessage(converter.convertTrade(rawJson))     : Mono.empty();
+                case "orderbook" -> dataTypes.isOrderbook() ? processMessage(converter.convertOrderBook(rawJson)) : Mono.empty();
                 default -> {
                     log.trace("[UPBIT] 알 수 없는 메시지 타입 무시: {}", messageType);
                     yield Mono.empty();
@@ -222,8 +194,9 @@ public class UpbitConnector extends AbstractExchangeConnector {
     @Override
     public List<String> loadMarketCodes() {
         List<String> marketCodes = new ArrayList<>();
+        List<String> prefixes = config().getMarketPrefixes();
 
-        for (String prefix : marketPrefixes) {
+        for (String prefix : prefixes) {
             List<String> enabledTiers = getEnabledTiers();
             for (String tier : enabledTiers) {
                 List<String> tierMarkets = loadTierMarkets(prefix.toLowerCase(), tier);
@@ -239,7 +212,7 @@ public class UpbitConnector extends AbstractExchangeConnector {
             log.warn("설정에서 마켓코드를 로드할 수 없어 기본값 사용: {}", marketCodes);
         }
 
-        log.info("전체 마켓코드 {}개 로드 완료 (prefix: {})", marketCodes.size(), marketPrefixes);
+        log.info("전체 마켓코드 {}개 로드 완료 (prefix: {})", marketCodes.size(), prefixes);
         return marketCodes;
     }
 
@@ -276,7 +249,7 @@ public class UpbitConnector extends AbstractExchangeConnector {
      * @return 활성화된 티어 목록
      */
     private List<String> getEnabledTiers() {
-        String environment = marketEnvironment.toLowerCase();
+        String environment = config().getEnvironment().toLowerCase();
         List<String> tiers = new ArrayList<>();
         int index = 0;
 
@@ -317,23 +290,24 @@ public class UpbitConnector extends AbstractExchangeConnector {
      * @throws IllegalStateException 활성화된 데이터 타입이 없는 경우
      */
     private String createSubscriptionMessage(List<String> marketCodes) throws JsonProcessingException {
+        ExchangeProperties.DataTypesConfig dataTypes = config().getDataTypes();
         List<Object> request = new ArrayList<>();
         request.add(new Ticket(UUID.randomUUID().toString()));
 
-        if (tickerEnabled) {
+        if (dataTypes.isTicker()) {
             request.add(new Type("ticker", marketCodes));
             log.info("Ticker 구독 활성화: {}개 마켓코드", marketCodes.size());
         }
-        if (tradeEnabled) {
+        if (dataTypes.isTrade()) {
             request.add(new Type("trade", marketCodes));
             log.info("Trade 구독 활성화: {}개 마켓코드", marketCodes.size());
         }
-        if (orderbookEnabled) {
+        if (dataTypes.isOrderbook()) {
             request.add(new Type("orderbook", marketCodes));
             log.info("OrderBook 구독 활성화: {}개 마켓코드", marketCodes.size());
         }
 
-        if (!tickerEnabled && !tradeEnabled && !orderbookEnabled) {
+        if (!dataTypes.isTicker() && !dataTypes.isTrade() && !dataTypes.isOrderbook()) {
             throw new IllegalStateException("최소 하나의 데이터 타입은 활성화되어야 합니다");
         }
 
