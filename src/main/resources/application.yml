@@ -32,6 +32,18 @@ exchanges:
         ticker: true
         trade: true
         orderbook: true
+    bithumb:
+      enabled: true
+      websocket-uri: wss://ws-api.bithumb.com/websocket/v1
+      ping-interval-seconds: 60
+      max-markets-per-connection: 100
+      processing-concurrency: 32
+      market-prefixes:
+        - KRW
+      data-types:
+        ticker: true
+        trade: true
+        orderbook: true
 
 rabbitmq:
   exchange:
