@@ -11,8 +11,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import com.rabbittick.streamer.connector.dto.upbit.UpbitOrderBookDto;
-import com.rabbittick.streamer.connector.dto.upbit.UpbitTickerDto;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rabbittick.streamer.connector.dto.common.CommonOrderBookDto;
+import com.rabbittick.streamer.connector.dto.common.CommonTickerDto;
 import com.rabbittick.streamer.global.dto.MarketDataMessage;
 import com.rabbittick.streamer.global.dto.OrderBookPayload;
 import com.rabbittick.streamer.global.dto.OrderBookUnitPayload;
@@ -24,14 +25,14 @@ class UpbitDataConverterTest {
 
 	@BeforeEach
 	void setUp() {
-		converter = new UpbitDataConverter();
+		converter = new UpbitDataConverter(new ObjectMapper());
 	}
 
 	@Test
-	@DisplayName("정상적인 UpbitTickerDto를 표준 메시지로 변환한다")
+	@DisplayName("정상적인 CommonTickerDto를 표준 메시지로 변환한다")
 	void convertTickerData_WithValidDto_ShouldReturnStandardMessage() {
 		// given
-		UpbitTickerDto upbitDto = createValidUpbitTickerDto();
+		CommonTickerDto upbitDto = createValidCommonTickerDto();
 
 		// when
 		MarketDataMessage<TickerPayload> result = converter.convertTickerData(upbitDto);
@@ -63,14 +64,14 @@ class UpbitDataConverterTest {
 		// when & then
 		assertThatThrownBy(() -> converter.convertTickerData(null))
 			.isInstanceOf(IllegalArgumentException.class)
-			.hasMessageContaining("UpbitTickerDto는 null일 수 없다");
+			.hasMessageContaining("CommonTickerDto는 null일 수 없다");
 	}
 
 	@Test
 	@DisplayName("필수 필드가 null인 경우 IllegalArgumentException을 발생시킨다")
 	void convertTickerData_WithNullMarketCode_ShouldThrowException() {
 		// given
-		UpbitTickerDto upbitDto = createValidUpbitTickerDto();
+		CommonTickerDto upbitDto = createValidCommonTickerDto();
 		upbitDto.setMarketCode(null);
 
 		// when & then
@@ -83,7 +84,7 @@ class UpbitDataConverterTest {
 	@DisplayName("현재가가 null인 경우 IllegalArgumentException을 발생시킨다")
 	void convertTickerData_WithNullTradePrice_ShouldThrowException() {
 		// given
-		UpbitTickerDto upbitDto = createValidUpbitTickerDto();
+		CommonTickerDto upbitDto = createValidCommonTickerDto();
 		upbitDto.setTradePrice(null);
 
 		// when & then
@@ -96,7 +97,7 @@ class UpbitDataConverterTest {
 	@DisplayName("메타데이터의 collectedAt은 ISO 8601 형식이어야 한다")
 	void convertTickerData_ShouldGenerateValidCollectedAt() {
 		// given
-		UpbitTickerDto upbitDto = createValidUpbitTickerDto();
+		CommonTickerDto upbitDto = createValidCommonTickerDto();
 
 		// when
 		MarketDataMessage<TickerPayload> result = converter.convertTickerData(upbitDto);
@@ -111,7 +112,7 @@ class UpbitDataConverterTest {
 	@DisplayName("메시지 ID는 매번 다른 UUID를 생성한다")
 	void convertTickerData_ShouldGenerateUniqueMessageId() {
 		// given
-		UpbitTickerDto upbitDto = createValidUpbitTickerDto();
+		CommonTickerDto upbitDto = createValidCommonTickerDto();
 
 		// when
 		MarketDataMessage<TickerPayload> result1 = converter.convertTickerData(upbitDto);
@@ -129,7 +130,7 @@ class UpbitDataConverterTest {
 	@DisplayName("BigDecimal 정밀도가 유지되어야 한다")
 	void convertTickerData_ShouldPreserveBigDecimalPrecision() {
 		// given
-		UpbitTickerDto upbitDto = createValidUpbitTickerDto();
+		CommonTickerDto upbitDto = createValidCommonTickerDto();
 		upbitDto.setTradePrice(new BigDecimal("70000000.12345678"));
 
 		// when
@@ -144,7 +145,7 @@ class UpbitDataConverterTest {
 	@DisplayName("0 값들도 정상적으로 처리되어야 한다")
 	void convertTickerData_WithZeroValues_ShouldHandleCorrectly() {
 		// given
-		UpbitTickerDto upbitDto = createValidUpbitTickerDto();
+		CommonTickerDto upbitDto = createValidCommonTickerDto();
 		upbitDto.setTradeVolume(BigDecimal.ZERO);
 		upbitDto.setAccTradeVolume24h(BigDecimal.ZERO);
 
@@ -158,10 +159,10 @@ class UpbitDataConverterTest {
 	}
 
 	@Test
-	@DisplayName("정상적인 UpbitOrderBookDto를 표준 메시지로 변환한다")
+	@DisplayName("정상적인 CommonOrderBookDto를 표준 메시지로 변환한다")
 	void convertOrderBookData_WithValidDto_ShouldReturnStandardMessage() {
 		// given
-		UpbitOrderBookDto upbitDto = createValidUpbitOrderBookDto();
+		CommonOrderBookDto upbitDto = createValidCommonOrderBookDto();
 
 		// when
 		MarketDataMessage<OrderBookPayload> result = converter.convertOrderBookData(upbitDto);
@@ -191,14 +192,14 @@ class UpbitDataConverterTest {
 		// when & then
 		assertThatThrownBy(() -> converter.convertOrderBookData(null))
 			.isInstanceOf(IllegalArgumentException.class)
-			.hasMessageContaining("UpbitOrderBookDto는 null일 수 없다");
+			.hasMessageContaining("CommonOrderBookDto는 null일 수 없다");
 	}
 
 	@Test
 	@DisplayName("OrderBook 필수 필드가 누락되면 IllegalArgumentException을 발생시킨다")
 	void convertOrderBookData_WithMissingFields_ShouldThrowException() {
 		// given
-		UpbitOrderBookDto upbitDto = createValidUpbitOrderBookDto();
+		CommonOrderBookDto upbitDto = createValidCommonOrderBookDto();
 		upbitDto.setOrderbookUnits(List.of());
 
 		// when & then
@@ -207,8 +208,8 @@ class UpbitDataConverterTest {
 			.hasMessageContaining("OrderBookUnits는 필수 필드다");
 	}
 
-	private UpbitTickerDto createValidUpbitTickerDto() {
-		UpbitTickerDto dto = new UpbitTickerDto();
+	private CommonTickerDto createValidCommonTickerDto() {
+		CommonTickerDto dto = new CommonTickerDto();
 		dto.setMarketCode("KRW-BTC");
 		dto.setTradePrice(new BigDecimal("70000000.00"));
 		dto.setTradeVolume(new BigDecimal("0.1234"));
@@ -222,8 +223,8 @@ class UpbitDataConverterTest {
 		return dto;
 	}
 
-	private UpbitOrderBookDto createValidUpbitOrderBookDto() {
-		UpbitOrderBookDto dto = new UpbitOrderBookDto();
+	private CommonOrderBookDto createValidCommonOrderBookDto() {
+		CommonOrderBookDto dto = new CommonOrderBookDto();
 		dto.setMarketCode("KRW-BTC");
 		dto.setTimestamp(1672531200000L);
 		dto.setTotalAskSize(new BigDecimal("12.34"));
@@ -233,9 +234,9 @@ class UpbitDataConverterTest {
 		return dto;
 	}
 
-	private UpbitOrderBookDto.OrderBookUnit createOrderBookUnit(BigDecimal askPrice, BigDecimal askSize,
+	private CommonOrderBookDto.OrderBookUnit createOrderBookUnit(BigDecimal askPrice, BigDecimal askSize,
 		BigDecimal bidPrice, BigDecimal bidSize) {
-		UpbitOrderBookDto.OrderBookUnit unit = new UpbitOrderBookDto.OrderBookUnit();
+		CommonOrderBookDto.OrderBookUnit unit = new CommonOrderBookDto.OrderBookUnit();
 		unit.setAskPrice(askPrice);
 		unit.setAskSize(askSize);
 		unit.setBidPrice(bidPrice);

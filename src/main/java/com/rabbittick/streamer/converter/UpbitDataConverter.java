@@ -8,9 +8,9 @@ import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.rabbittick.streamer.connector.dto.upbit.UpbitOrderBookDto;
-import com.rabbittick.streamer.connector.dto.upbit.UpbitTickerDto;
-import com.rabbittick.streamer.connector.dto.upbit.UpbitTradeDto;
+import com.rabbittick.streamer.connector.dto.common.CommonOrderBookDto;
+import com.rabbittick.streamer.connector.dto.common.CommonTickerDto;
+import com.rabbittick.streamer.connector.dto.common.CommonTradeDto;
 import com.rabbittick.streamer.global.dto.MarketDataMessage;
 import com.rabbittick.streamer.global.dto.Metadata;
 import com.rabbittick.streamer.global.dto.OrderBookPayload;
@@ -48,7 +48,7 @@ public class UpbitDataConverter implements ExchangeDataConverter {
 	}
 
 	/**
-	 * 원시 JSON 문자열을 {@link UpbitTickerDto}로 파싱하여 표준 ticker 메시지로 변환한다.
+	 * 원시 JSON 문자열을 {@link CommonTickerDto}로 파싱하여 표준 ticker 메시지로 변환한다.
 	 *
 	 * @param rawJson Upbit WebSocket으로부터 수신된 원시 JSON 문자열
 	 * @return 표준화된 ticker MarketDataMessage
@@ -57,7 +57,7 @@ public class UpbitDataConverter implements ExchangeDataConverter {
 	@Override
 	public MarketDataMessage<TickerPayload> convertTicker(String rawJson) {
 		try {
-			UpbitTickerDto dto = objectMapper.readValue(rawJson, UpbitTickerDto.class);
+			CommonTickerDto dto = objectMapper.readValue(rawJson, CommonTickerDto.class);
 			return convertTickerData(dto);
 		} catch (JsonProcessingException e) {
 			throw new IllegalArgumentException("Ticker JSON 파싱 실패: " + e.getMessage(), e);
@@ -65,7 +65,7 @@ public class UpbitDataConverter implements ExchangeDataConverter {
 	}
 
 	/**
-	 * 원시 JSON 문자열을 {@link UpbitTradeDto}로 파싱하여 표준 trade 메시지로 변환한다.
+	 * 원시 JSON 문자열을 {@link CommonTradeDto}로 파싱하여 표준 trade 메시지로 변환한다.
 	 *
 	 * @param rawJson Upbit WebSocket으로부터 수신된 원시 JSON 문자열
 	 * @return 표준화된 trade MarketDataMessage
@@ -74,7 +74,7 @@ public class UpbitDataConverter implements ExchangeDataConverter {
 	@Override
 	public MarketDataMessage<TradePayload> convertTrade(String rawJson) {
 		try {
-			UpbitTradeDto dto = objectMapper.readValue(rawJson, UpbitTradeDto.class);
+			CommonTradeDto dto = objectMapper.readValue(rawJson, CommonTradeDto.class);
 			return convertTradeData(dto);
 		} catch (JsonProcessingException e) {
 			throw new IllegalArgumentException("Trade JSON 파싱 실패: " + e.getMessage(), e);
@@ -82,7 +82,7 @@ public class UpbitDataConverter implements ExchangeDataConverter {
 	}
 
 	/**
-	 * 원시 JSON 문자열을 {@link UpbitOrderBookDto}로 파싱하여 표준 orderbook 메시지로 변환한다.
+	 * 원시 JSON 문자열을 {@link CommonOrderBookDto}로 파싱하여 표준 orderbook 메시지로 변환한다.
 	 *
 	 * @param rawJson Upbit WebSocket으로부터 수신된 원시 JSON 문자열
 	 * @return 표준화된 orderbook MarketDataMessage
@@ -91,7 +91,7 @@ public class UpbitDataConverter implements ExchangeDataConverter {
 	@Override
 	public MarketDataMessage<OrderBookPayload> convertOrderBook(String rawJson) {
 		try {
-			UpbitOrderBookDto dto = objectMapper.readValue(rawJson, UpbitOrderBookDto.class);
+			CommonOrderBookDto dto = objectMapper.readValue(rawJson, CommonOrderBookDto.class);
 			return convertOrderBookData(dto);
 		} catch (JsonProcessingException e) {
 			throw new IllegalArgumentException("OrderBook JSON 파싱 실패: " + e.getMessage(), e);
@@ -99,13 +99,13 @@ public class UpbitDataConverter implements ExchangeDataConverter {
 	}
 
 	/**
-	 * UpbitTickerDto를 표준 MarketDataMessage로 변환한다.
+	 * CommonTickerDto를 표준 MarketDataMessage로 변환한다.
 	 *
 	 * @param upbitDto Upbit WebSocket에서 수신한 ticker DTO
 	 * @return 표준화된 MarketDataMessage
 	 * @throws IllegalArgumentException 필수 필드가 누락된 경우
 	 */
-	public MarketDataMessage<TickerPayload> convertTickerData(UpbitTickerDto upbitDto) {
+	public MarketDataMessage<TickerPayload> convertTickerData(CommonTickerDto upbitDto) {
 		validateTickerInput(upbitDto);
 
 		TickerPayload payload = convertToTickerPayload(upbitDto);
@@ -115,13 +115,13 @@ public class UpbitDataConverter implements ExchangeDataConverter {
 	}
 
     /**
-     * UpbitTradeDto를 표준 MarketDataMessage로 변환한다.
+     * CommonTradeDto를 표준 MarketDataMessage로 변환한다.
      *
      * @param upbitDto Upbit WebSocket에서 수신한 trade DTO
      * @return 표준화된 MarketDataMessage
      * @throws IllegalArgumentException 필수 필드가 누락된 경우
      */
-    public MarketDataMessage<TradePayload> convertTradeData(UpbitTradeDto upbitDto) {
+    public MarketDataMessage<TradePayload> convertTradeData(CommonTradeDto upbitDto) {
         validateTradeInput(upbitDto);
 
         TradePayload payload = convertToTradePayload(upbitDto);
@@ -131,13 +131,13 @@ public class UpbitDataConverter implements ExchangeDataConverter {
     }
 
 	/**
-	 * UpbitOrderBookDto를 표준 MarketDataMessage로 변환한다.
+	 * CommonOrderBookDto를 표준 MarketDataMessage로 변환한다.
 	 *
 	 * @param upbitDto Upbit WebSocket에서 수신한 orderbook DTO
 	 * @return 표준화된 MarketDataMessage
 	 * @throws IllegalArgumentException 필수 필드가 누락된 경우
 	 */
-	public MarketDataMessage<OrderBookPayload> convertOrderBookData(UpbitOrderBookDto upbitDto) {
+	public MarketDataMessage<OrderBookPayload> convertOrderBookData(CommonOrderBookDto upbitDto) {
 		validateOrderBookInput(upbitDto);
 
 		OrderBookPayload payload = convertToOrderBookPayload(upbitDto);
@@ -147,12 +147,12 @@ public class UpbitDataConverter implements ExchangeDataConverter {
 	}
 
 	/**
-	 * UpbitTickerDto를 TickerPayload로 변환한다.
+	 * CommonTickerDto를 TickerPayload로 변환한다.
 	 *
 	 * @param dto Upbit ticker DTO
 	 * @return 변환된 TickerPayload
 	 */
-	private TickerPayload convertToTickerPayload(UpbitTickerDto dto) {
+	private TickerPayload convertToTickerPayload(CommonTickerDto dto) {
 		return TickerPayload.builder()
 			.marketCode(dto.getMarketCode())
 			.tradePrice(dto.getTradePrice())
@@ -168,12 +168,12 @@ public class UpbitDataConverter implements ExchangeDataConverter {
 	}
 
     /**
-     * UpbitTradeDto를 TradePayload로 변환한다.
+     * CommonTradeDto를 TradePayload로 변환한다.
      *
      * @param dto Upbit trade DTO
      * @return 변환된 TradePayload
      */
-    private TradePayload convertToTradePayload(UpbitTradeDto dto) {
+    private TradePayload convertToTradePayload(CommonTradeDto dto) {
         return TradePayload.builder()
                 .marketCode(dto.getMarketCode())
                 .timestamp(dto.getTimestamp())
@@ -196,12 +196,12 @@ public class UpbitDataConverter implements ExchangeDataConverter {
     }
 
 	/**
-	 * UpbitOrderBookDto를 OrderBookPayload로 변환한다.
+	 * CommonOrderBookDto를 OrderBookPayload로 변환한다.
 	 *
 	 * @param dto Upbit orderbook DTO
 	 * @return 변환된 OrderBookPayload
 	 */
-	private OrderBookPayload convertToOrderBookPayload(UpbitOrderBookDto dto) {
+	private OrderBookPayload convertToOrderBookPayload(CommonOrderBookDto dto) {
 		List<OrderBookUnitPayload> units = dto.getOrderbookUnits().stream()
 			.map(unit -> OrderBookUnitPayload.builder()
 				.askPrice(unit.getAskPrice())
@@ -256,9 +256,9 @@ public class UpbitDataConverter implements ExchangeDataConverter {
 	 * @param dto 검증할 DTO
 	 * @throws IllegalArgumentException 필수 필드 누락 시
 	 */
-	private void validateTickerInput(UpbitTickerDto dto) {
+	private void validateTickerInput(CommonTickerDto dto) {
 		if (dto == null) {
-			throw new IllegalArgumentException("UpbitTickerDto는 null일 수 없다");
+			throw new IllegalArgumentException("CommonTickerDto는 null일 수 없다");
 		}
 		if (dto.getMarketCode() == null || dto.getMarketCode().trim().isEmpty()) {
 			throw new IllegalArgumentException("MarketCode는 필수 필드이다");
@@ -277,9 +277,9 @@ public class UpbitDataConverter implements ExchangeDataConverter {
      * @param dto 검증할 DTO
      * @throws IllegalArgumentException 필수 필드 누락 시
      */
-    private void validateTradeInput(UpbitTradeDto dto) {
+    private void validateTradeInput(CommonTradeDto dto) {
         if (dto == null) {
-            throw new IllegalArgumentException("UpbitTradeDto는 null일 수 없다");
+            throw new IllegalArgumentException("CommonTradeDto는 null일 수 없다");
         }
         if (dto.getMarketCode() == null || dto.getMarketCode().trim().isEmpty()) {
             throw new IllegalArgumentException("MarketCode는 필수 필드다");
@@ -310,9 +310,9 @@ public class UpbitDataConverter implements ExchangeDataConverter {
 	 * @param dto 검증할 DTO
 	 * @throws IllegalArgumentException 필수 필드 누락 시
 	 */
-	private void validateOrderBookInput(UpbitOrderBookDto dto) {
+	private void validateOrderBookInput(CommonOrderBookDto dto) {
 		if (dto == null) {
-			throw new IllegalArgumentException("UpbitOrderBookDto는 null일 수 없다");
+			throw new IllegalArgumentException("CommonOrderBookDto는 null일 수 없다");
 		}
 		if (dto.getMarketCode() == null || dto.getMarketCode().trim().isEmpty()) {
 			throw new IllegalArgumentException("MarketCode는 필수 필드다");

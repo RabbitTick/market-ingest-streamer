@@ -8,9 +8,9 @@ import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.rabbittick.streamer.connector.dto.upbit.UpbitOrderBookDto;
-import com.rabbittick.streamer.connector.dto.upbit.UpbitTickerDto;
-import com.rabbittick.streamer.connector.dto.upbit.UpbitTradeDto;
+import com.rabbittick.streamer.connector.dto.common.CommonOrderBookDto;
+import com.rabbittick.streamer.connector.dto.common.CommonTickerDto;
+import com.rabbittick.streamer.connector.dto.common.CommonTradeDto;
 import com.rabbittick.streamer.global.dto.MarketDataMessage;
 import com.rabbittick.streamer.global.dto.Metadata;
 import com.rabbittick.streamer.global.dto.OrderBookPayload;
@@ -26,8 +26,8 @@ import lombok.RequiredArgsConstructor;
  * <p>{@link ExchangeDataConverter}를 구현하여 원시 JSON 문자열을 직접 수신하고,
  * Bithumb 전용 DTO로 파싱한 후 거래소 독립적인 {@link MarketDataMessage}로 변환한다.
  *
- * <p>Bithumb SIMPLE 포맷 필드가 Upbit와 동일하므로 {@link UpbitTickerDto},
- * {@link UpbitTradeDto}, {@link UpbitOrderBookDto}를 역직렬화 대상으로 재사용한다.
+ * <p>Bithumb WebSocket SIMPLE 포맷이 공통 DTO({@link CommonTickerDto}, {@link CommonTradeDto},
+ * {@link CommonOrderBookDto})와 동일하므로 재사용한다.
  * 필드 불일치가 확인될 경우 {@code connector/dto/bithumb/} 아래에 전용 DTO를 추가한다.
  *
  * <p>지원하는 데이터 타입:
@@ -52,7 +52,7 @@ public class BithumbDataConverter implements ExchangeDataConverter {
     }
 
     /**
-     * 원시 JSON 문자열을 {@link UpbitTickerDto}로 파싱하여 표준 ticker 메시지로 변환한다.
+     * 원시 JSON 문자열을 {@link CommonTickerDto}로 파싱하여 표준 ticker 메시지로 변환한다.
      *
      * @param rawJson Bithumb WebSocket으로부터 수신된 원시 JSON 문자열
      * @return 표준화된 ticker MarketDataMessage
@@ -61,7 +61,7 @@ public class BithumbDataConverter implements ExchangeDataConverter {
     @Override
     public MarketDataMessage<TickerPayload> convertTicker(String rawJson) {
         try {
-            UpbitTickerDto dto = objectMapper.readValue(rawJson, UpbitTickerDto.class);
+            CommonTickerDto dto = objectMapper.readValue(rawJson, CommonTickerDto.class);
             return convertTickerData(dto);
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("Ticker JSON 파싱 실패: " + e.getMessage(), e);
@@ -69,7 +69,7 @@ public class BithumbDataConverter implements ExchangeDataConverter {
     }
 
     /**
-     * 원시 JSON 문자열을 {@link UpbitTradeDto}로 파싱하여 표준 trade 메시지로 변환한다.
+     * 원시 JSON 문자열을 {@link CommonTradeDto}로 파싱하여 표준 trade 메시지로 변환한다.
      *
      * @param rawJson Bithumb WebSocket으로부터 수신된 원시 JSON 문자열
      * @return 표준화된 trade MarketDataMessage
@@ -78,7 +78,7 @@ public class BithumbDataConverter implements ExchangeDataConverter {
     @Override
     public MarketDataMessage<TradePayload> convertTrade(String rawJson) {
         try {
-            UpbitTradeDto dto = objectMapper.readValue(rawJson, UpbitTradeDto.class);
+            CommonTradeDto dto = objectMapper.readValue(rawJson, CommonTradeDto.class);
             return convertTradeData(dto);
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("Trade JSON 파싱 실패: " + e.getMessage(), e);
@@ -86,7 +86,7 @@ public class BithumbDataConverter implements ExchangeDataConverter {
     }
 
     /**
-     * 원시 JSON 문자열을 {@link UpbitOrderBookDto}로 파싱하여 표준 orderbook 메시지로 변환한다.
+     * 원시 JSON 문자열을 {@link CommonOrderBookDto}로 파싱하여 표준 orderbook 메시지로 변환한다.
      *
      * @param rawJson Bithumb WebSocket으로부터 수신된 원시 JSON 문자열
      * @return 표준화된 orderbook MarketDataMessage
@@ -95,7 +95,7 @@ public class BithumbDataConverter implements ExchangeDataConverter {
     @Override
     public MarketDataMessage<OrderBookPayload> convertOrderBook(String rawJson) {
         try {
-            UpbitOrderBookDto dto = objectMapper.readValue(rawJson, UpbitOrderBookDto.class);
+            CommonOrderBookDto dto = objectMapper.readValue(rawJson, CommonOrderBookDto.class);
             return convertOrderBookData(dto);
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("OrderBook JSON 파싱 실패: " + e.getMessage(), e);
@@ -103,13 +103,13 @@ public class BithumbDataConverter implements ExchangeDataConverter {
     }
 
     /**
-     * {@link UpbitTickerDto}를 표준 MarketDataMessage로 변환한다.
+     * {@link CommonTickerDto}를 표준 MarketDataMessage로 변환한다.
      *
      * @param dto Bithumb WebSocket에서 수신한 ticker DTO
      * @return 표준화된 MarketDataMessage
      * @throws IllegalArgumentException 필수 필드가 누락된 경우
      */
-    private MarketDataMessage<TickerPayload> convertTickerData(UpbitTickerDto dto) {
+    private MarketDataMessage<TickerPayload> convertTickerData(CommonTickerDto dto) {
         validateTickerInput(dto);
         TickerPayload payload = TickerPayload.builder()
                 .marketCode(dto.getMarketCode())
@@ -127,13 +127,13 @@ public class BithumbDataConverter implements ExchangeDataConverter {
     }
 
     /**
-     * {@link UpbitTradeDto}를 표준 MarketDataMessage로 변환한다.
+     * {@link CommonTradeDto}를 표준 MarketDataMessage로 변환한다.
      *
      * @param dto Bithumb WebSocket에서 수신한 trade DTO
      * @return 표준화된 MarketDataMessage
      * @throws IllegalArgumentException 필수 필드가 누락된 경우
      */
-    private MarketDataMessage<TradePayload> convertTradeData(UpbitTradeDto dto) {
+    private MarketDataMessage<TradePayload> convertTradeData(CommonTradeDto dto) {
         validateTradeInput(dto);
         TradePayload payload = TradePayload.builder()
                 .marketCode(dto.getMarketCode())
@@ -158,13 +158,13 @@ public class BithumbDataConverter implements ExchangeDataConverter {
     }
 
     /**
-     * {@link UpbitOrderBookDto}를 표준 MarketDataMessage로 변환한다.
+     * {@link CommonOrderBookDto}를 표준 MarketDataMessage로 변환한다.
      *
      * @param dto Bithumb WebSocket에서 수신한 orderbook DTO
      * @return 표준화된 MarketDataMessage
      * @throws IllegalArgumentException 필수 필드가 누락된 경우
      */
-    private MarketDataMessage<OrderBookPayload> convertOrderBookData(UpbitOrderBookDto dto) {
+    private MarketDataMessage<OrderBookPayload> convertOrderBookData(CommonOrderBookDto dto) {
         validateOrderBookInput(dto);
         List<OrderBookUnitPayload> units = dto.getOrderbookUnits().stream()
                 .map(unit -> OrderBookUnitPayload.builder()
@@ -220,8 +220,8 @@ public class BithumbDataConverter implements ExchangeDataConverter {
      * @param dto 검증할 DTO
      * @throws IllegalArgumentException 필수 필드 누락 시
      */
-    private void validateTickerInput(UpbitTickerDto dto) {
-        if (dto == null) throw new IllegalArgumentException("UpbitTickerDto는 null일 수 없다");
+    private void validateTickerInput(CommonTickerDto dto) {
+        if (dto == null) throw new IllegalArgumentException("CommonTickerDto는 null일 수 없다");
         if (dto.getMarketCode() == null || dto.getMarketCode().trim().isEmpty())
             throw new IllegalArgumentException("MarketCode는 필수 필드이다");
         if (dto.getTradePrice() == null) throw new IllegalArgumentException("TradePrice는 필수 필드이다");
@@ -234,8 +234,8 @@ public class BithumbDataConverter implements ExchangeDataConverter {
      * @param dto 검증할 DTO
      * @throws IllegalArgumentException 필수 필드 누락 시
      */
-    private void validateTradeInput(UpbitTradeDto dto) {
-        if (dto == null) throw new IllegalArgumentException("UpbitTradeDto는 null일 수 없다");
+    private void validateTradeInput(CommonTradeDto dto) {
+        if (dto == null) throw new IllegalArgumentException("CommonTradeDto는 null일 수 없다");
         if (dto.getMarketCode() == null || dto.getMarketCode().trim().isEmpty())
             throw new IllegalArgumentException("MarketCode는 필수 필드다");
         if (dto.getTradePrice() == null) throw new IllegalArgumentException("TradePrice는 필수 필드다");
@@ -253,8 +253,8 @@ public class BithumbDataConverter implements ExchangeDataConverter {
      * @param dto 검증할 DTO
      * @throws IllegalArgumentException 필수 필드 누락 시
      */
-    private void validateOrderBookInput(UpbitOrderBookDto dto) {
-        if (dto == null) throw new IllegalArgumentException("UpbitOrderBookDto는 null일 수 없다");
+    private void validateOrderBookInput(CommonOrderBookDto dto) {
+        if (dto == null) throw new IllegalArgumentException("CommonOrderBookDto는 null일 수 없다");
         if (dto.getMarketCode() == null || dto.getMarketCode().trim().isEmpty())
             throw new IllegalArgumentException("MarketCode는 필수 필드다");
         if (dto.getTimestamp() <= 0) throw new IllegalArgumentException("Timestamp는 양수여야 한다");
