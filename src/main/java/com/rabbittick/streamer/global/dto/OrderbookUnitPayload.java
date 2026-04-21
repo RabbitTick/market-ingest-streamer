@@ -10,7 +10,7 @@ import lombok.Data;
  */
 @Data
 @Builder
-public class OrderBookUnitPayload {
+public class OrderbookUnitPayload {
 
 	/**
 	 * 매도 호가 가격.

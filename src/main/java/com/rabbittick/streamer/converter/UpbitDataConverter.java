@@ -8,13 +8,13 @@ import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.rabbittick.streamer.connector.dto.common.CommonOrderBookDto;
+import com.rabbittick.streamer.connector.dto.common.CommonOrderbookDto;
 import com.rabbittick.streamer.connector.dto.common.CommonTickerDto;
 import com.rabbittick.streamer.connector.dto.common.CommonTradeDto;
 import com.rabbittick.streamer.global.dto.MarketDataMessage;
 import com.rabbittick.streamer.global.dto.Metadata;
-import com.rabbittick.streamer.global.dto.OrderBookPayload;
-import com.rabbittick.streamer.global.dto.OrderBookUnitPayload;
+import com.rabbittick.streamer.global.dto.OrderbookPayload;
+import com.rabbittick.streamer.global.dto.OrderbookUnitPayload;
 import com.rabbittick.streamer.global.dto.TickerPayload;
 import com.rabbittick.streamer.global.dto.TradePayload;
 
@@ -82,16 +82,16 @@ public class UpbitDataConverter implements ExchangeDataConverter {
 	}
 
 	/**
-	 * 원시 JSON 문자열을 {@link CommonOrderBookDto}로 파싱하여 표준 orderbook 메시지로 변환한다.
+	 * 원시 JSON 문자열을 {@link CommonOrderbookDto}로 파싱하여 표준 orderbook 메시지로 변환한다.
 	 *
 	 * @param rawJson Upbit WebSocket으로부터 수신된 원시 JSON 문자열
 	 * @return 표준화된 orderbook MarketDataMessage
 	 * @throws IllegalArgumentException JSON 파싱 실패 시
 	 */
 	@Override
-	public MarketDataMessage<OrderBookPayload> convertOrderBook(String rawJson) {
+	public MarketDataMessage<OrderbookPayload> convertOrderBook(String rawJson) {
 		try {
-			CommonOrderBookDto dto = objectMapper.readValue(rawJson, CommonOrderBookDto.class);
+			CommonOrderbookDto dto = objectMapper.readValue(rawJson, CommonOrderbookDto.class);
 			return convertOrderBookData(dto);
 		} catch (JsonProcessingException e) {
 			throw new IllegalArgumentException("OrderBook JSON 파싱 실패: " + e.getMessage(), e);
@@ -131,16 +131,16 @@ public class UpbitDataConverter implements ExchangeDataConverter {
     }
 
 	/**
-	 * CommonOrderBookDto를 표준 MarketDataMessage로 변환한다.
+	 * CommonOrderbookDto를 표준 MarketDataMessage로 변환한다.
 	 *
 	 * @param upbitDto Upbit WebSocket에서 수신한 orderbook DTO
 	 * @return 표준화된 MarketDataMessage
 	 * @throws IllegalArgumentException 필수 필드가 누락된 경우
 	 */
-	public MarketDataMessage<OrderBookPayload> convertOrderBookData(CommonOrderBookDto upbitDto) {
+	public MarketDataMessage<OrderbookPayload> convertOrderBookData(CommonOrderbookDto upbitDto) {
 		validateOrderBookInput(upbitDto);
 
-		OrderBookPayload payload = convertToOrderBookPayload(upbitDto);
+		OrderbookPayload payload = convertToOrderbookPayload(upbitDto);
 		Metadata metadata = createMetadata(DataType.ORDERBOOK);
 
 		return createMessage(metadata, payload);
@@ -196,14 +196,14 @@ public class UpbitDataConverter implements ExchangeDataConverter {
     }
 
 	/**
-	 * CommonOrderBookDto를 OrderBookPayload로 변환한다.
+	 * CommonOrderbookDto를 OrderbookPayload로 변환한다.
 	 *
 	 * @param dto Upbit orderbook DTO
-	 * @return 변환된 OrderBookPayload
+	 * @return 변환된 OrderbookPayload
 	 */
-	private OrderBookPayload convertToOrderBookPayload(CommonOrderBookDto dto) {
-		List<OrderBookUnitPayload> units = dto.getOrderbookUnits().stream()
-			.map(unit -> OrderBookUnitPayload.builder()
+	private OrderbookPayload convertToOrderbookPayload(CommonOrderbookDto dto) {
+		List<OrderbookUnitPayload> units = dto.getOrderbookUnits().stream()
+			.map(unit -> OrderbookUnitPayload.builder()
 				.askPrice(unit.getAskPrice())
 				.askSize(unit.getAskSize())
 				.bidPrice(unit.getBidPrice())
@@ -211,7 +211,7 @@ public class UpbitDataConverter implements ExchangeDataConverter {
 				.build())
 			.toList();
 
-		return OrderBookPayload.builder()
+		return OrderbookPayload.builder()
 			.marketCode(dto.getMarketCode())
 			.timestamp(dto.getTimestamp())
 			.totalAskSize(dto.getTotalAskSize())
@@ -310,9 +310,9 @@ public class UpbitDataConverter implements ExchangeDataConverter {
 	 * @param dto 검증할 DTO
 	 * @throws IllegalArgumentException 필수 필드 누락 시
 	 */
-	private void validateOrderBookInput(CommonOrderBookDto dto) {
+	private void validateOrderBookInput(CommonOrderbookDto dto) {
 		if (dto == null) {
-			throw new IllegalArgumentException("CommonOrderBookDto는 null일 수 없다");
+			throw new IllegalArgumentException("CommonOrderbookDto는 null일 수 없다");
 		}
 		if (dto.getMarketCode() == null || dto.getMarketCode().trim().isEmpty()) {
 			throw new IllegalArgumentException("MarketCode는 필수 필드다");

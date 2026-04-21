@@ -17,7 +17,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * WebSocket OrderBook 응답 데이터를 담는 공통 DTO 클래스.
+ * WebSocket Orderbook 응답 데이터를 담는 공통 DTO 클래스.
  *
  * <p>주요 책임:
  * <ul>
@@ -32,7 +32,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class CommonOrderBookDto {
+public class CommonOrderbookDto {
 
 	/**
 	 * 마켓 코드 (예: KRW-BTC, KRW-ETH).
@@ -80,7 +80,7 @@ public class CommonOrderBookDto {
 	@NotNull(message = "호가 리스트는 필수값입니다")
 	@Size(min = 1, message = "호가 리스트는 최소 1개 이상이어야 합니다")
 	@Valid
-	private List<OrderBookUnit> orderbookUnits;
+	private List<OrderbookUnit> orderbookUnits;
 
 	/**
 	 * 호가 단위를 담는 DTO 클래스.
@@ -88,7 +88,7 @@ public class CommonOrderBookDto {
 	@Data
 	@NoArgsConstructor
 	@JsonIgnoreProperties(ignoreUnknown = true)
-	public static class OrderBookUnit {
+	public static class OrderbookUnit {
 
 		/**
 		 * 매도 호가 가격.

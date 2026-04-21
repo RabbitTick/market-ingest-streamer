@@ -1,7 +1,7 @@
 package com.rabbittick.streamer.converter;
 
 import com.rabbittick.streamer.global.dto.MarketDataMessage;
-import com.rabbittick.streamer.global.dto.OrderBookPayload;
+import com.rabbittick.streamer.global.dto.OrderbookPayload;
 import com.rabbittick.streamer.global.dto.TickerPayload;
 import com.rabbittick.streamer.global.dto.TradePayload;
 
@@ -58,5 +58,5 @@ public interface ExchangeDataConverter {
      * @return 표준화된 orderbook MarketDataMessage
      * @throws IllegalArgumentException JSON 파싱 실패 또는 필수 필드 누락 시
      */
-    MarketDataMessage<OrderBookPayload> convertOrderBook(String rawJson);
+    MarketDataMessage<OrderbookPayload> convertOrderBook(String rawJson);
 }

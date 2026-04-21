@@ -21,7 +21,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbittick.streamer.global.dto.MarketDataMessage;
 import com.rabbittick.streamer.global.dto.Metadata;
-import com.rabbittick.streamer.global.dto.OrderBookPayload;
+import com.rabbittick.streamer.global.dto.OrderbookPayload;
 import com.rabbittick.streamer.global.dto.TickerPayload;
 
 @ExtendWith(MockitoExtension.class)
@@ -144,11 +144,11 @@ class MarketDataPublisherTest {
 			.version("1.0")
 			.build();
 
-		OrderBookPayload payload = OrderBookPayload.builder()
+		OrderbookPayload payload = OrderbookPayload.builder()
 			.marketCode("KRW-BTC")
 			.build();
 
-		MarketDataMessage<OrderBookPayload> orderBookMessage = MarketDataMessage.<OrderBookPayload>builder()
+		MarketDataMessage<OrderbookPayload> orderBookMessage = MarketDataMessage.<OrderbookPayload>builder()
 			.metadata(metadata)
 			.payload(payload)
 			.build();

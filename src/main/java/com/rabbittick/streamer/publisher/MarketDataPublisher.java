@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbittick.streamer.global.dto.MarketDataMessage;
-import com.rabbittick.streamer.global.dto.OrderBookPayload;
+import com.rabbittick.streamer.global.dto.OrderbookPayload;
 import com.rabbittick.streamer.global.dto.TickerPayload;
 import com.rabbittick.streamer.global.dto.TradePayload;
 import lombok.RequiredArgsConstructor;
@@ -135,8 +135,8 @@ public class MarketDataPublisher {
         if (payload instanceof TradePayload) {
             return ((TradePayload) payload).getMarketCode();
         }
-        if (payload instanceof OrderBookPayload) {
-            return ((OrderBookPayload) payload).getMarketCode();
+        if (payload instanceof OrderbookPayload) {
+            return ((OrderbookPayload) payload).getMarketCode();
         }
         throw new IllegalArgumentException("지원하지 않는 payload 타입: " + message.getPayload().getClass().getSimpleName());
     }

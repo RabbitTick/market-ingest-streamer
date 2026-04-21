@@ -8,13 +8,13 @@ import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.rabbittick.streamer.connector.dto.common.CommonOrderBookDto;
+import com.rabbittick.streamer.connector.dto.common.CommonOrderbookDto;
 import com.rabbittick.streamer.connector.dto.common.CommonTickerDto;
 import com.rabbittick.streamer.connector.dto.common.CommonTradeDto;
 import com.rabbittick.streamer.global.dto.MarketDataMessage;
 import com.rabbittick.streamer.global.dto.Metadata;
-import com.rabbittick.streamer.global.dto.OrderBookPayload;
-import com.rabbittick.streamer.global.dto.OrderBookUnitPayload;
+import com.rabbittick.streamer.global.dto.OrderbookPayload;
+import com.rabbittick.streamer.global.dto.OrderbookUnitPayload;
 import com.rabbittick.streamer.global.dto.TickerPayload;
 import com.rabbittick.streamer.global.dto.TradePayload;
 
@@ -27,7 +27,7 @@ import lombok.RequiredArgsConstructor;
  * Bithumb 전용 DTO로 파싱한 후 거래소 독립적인 {@link MarketDataMessage}로 변환한다.
  *
  * <p>Bithumb WebSocket SIMPLE 포맷이 공통 DTO({@link CommonTickerDto}, {@link CommonTradeDto},
- * {@link CommonOrderBookDto})와 동일하므로 재사용한다.
+ * {@link CommonOrderbookDto})와 동일하므로 재사용한다.
  * 필드 불일치가 확인될 경우 {@code connector/dto/bithumb/} 아래에 전용 DTO를 추가한다.
  *
  * <p>지원하는 데이터 타입:
@@ -86,16 +86,16 @@ public class BithumbDataConverter implements ExchangeDataConverter {
     }
 
     /**
-     * 원시 JSON 문자열을 {@link CommonOrderBookDto}로 파싱하여 표준 orderbook 메시지로 변환한다.
+     * 원시 JSON 문자열을 {@link CommonOrderbookDto}로 파싱하여 표준 orderbook 메시지로 변환한다.
      *
      * @param rawJson Bithumb WebSocket으로부터 수신된 원시 JSON 문자열
      * @return 표준화된 orderbook MarketDataMessage
      * @throws IllegalArgumentException JSON 파싱 실패 시
      */
     @Override
-    public MarketDataMessage<OrderBookPayload> convertOrderBook(String rawJson) {
+    public MarketDataMessage<OrderbookPayload> convertOrderBook(String rawJson) {
         try {
-            CommonOrderBookDto dto = objectMapper.readValue(rawJson, CommonOrderBookDto.class);
+            CommonOrderbookDto dto = objectMapper.readValue(rawJson, CommonOrderbookDto.class);
             return convertOrderBookData(dto);
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("OrderBook JSON 파싱 실패: " + e.getMessage(), e);
@@ -158,23 +158,23 @@ public class BithumbDataConverter implements ExchangeDataConverter {
     }
 
     /**
-     * {@link CommonOrderBookDto}를 표준 MarketDataMessage로 변환한다.
+     * {@link CommonOrderbookDto}를 표준 MarketDataMessage로 변환한다.
      *
      * @param dto Bithumb WebSocket에서 수신한 orderbook DTO
      * @return 표준화된 MarketDataMessage
      * @throws IllegalArgumentException 필수 필드가 누락된 경우
      */
-    private MarketDataMessage<OrderBookPayload> convertOrderBookData(CommonOrderBookDto dto) {
+    private MarketDataMessage<OrderbookPayload> convertOrderBookData(CommonOrderbookDto dto) {
         validateOrderBookInput(dto);
-        List<OrderBookUnitPayload> units = dto.getOrderbookUnits().stream()
-                .map(unit -> OrderBookUnitPayload.builder()
+        List<OrderbookUnitPayload> units = dto.getOrderbookUnits().stream()
+                .map(unit -> OrderbookUnitPayload.builder()
                         .askPrice(unit.getAskPrice())
                         .askSize(unit.getAskSize())
                         .bidPrice(unit.getBidPrice())
                         .bidSize(unit.getBidSize())
                         .build())
                 .toList();
-        OrderBookPayload payload = OrderBookPayload.builder()
+        OrderbookPayload payload = OrderbookPayload.builder()
                 .marketCode(dto.getMarketCode())
                 .timestamp(dto.getTimestamp())
                 .totalAskSize(dto.getTotalAskSize())
@@ -253,8 +253,8 @@ public class BithumbDataConverter implements ExchangeDataConverter {
      * @param dto 검증할 DTO
      * @throws IllegalArgumentException 필수 필드 누락 시
      */
-    private void validateOrderBookInput(CommonOrderBookDto dto) {
-        if (dto == null) throw new IllegalArgumentException("CommonOrderBookDto는 null일 수 없다");
+    private void validateOrderBookInput(CommonOrderbookDto dto) {
+        if (dto == null) throw new IllegalArgumentException("CommonOrderbookDto는 null일 수 없다");
         if (dto.getMarketCode() == null || dto.getMarketCode().trim().isEmpty())
             throw new IllegalArgumentException("MarketCode는 필수 필드다");
         if (dto.getTimestamp() <= 0) throw new IllegalArgumentException("Timestamp는 양수여야 한다");

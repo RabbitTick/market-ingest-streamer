@@ -12,11 +12,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.rabbittick.streamer.connector.dto.common.CommonOrderBookDto;
+import com.rabbittick.streamer.connector.dto.common.CommonOrderbookDto;
 import com.rabbittick.streamer.connector.dto.common.CommonTickerDto;
 import com.rabbittick.streamer.global.dto.MarketDataMessage;
-import com.rabbittick.streamer.global.dto.OrderBookPayload;
-import com.rabbittick.streamer.global.dto.OrderBookUnitPayload;
+import com.rabbittick.streamer.global.dto.OrderbookPayload;
+import com.rabbittick.streamer.global.dto.OrderbookUnitPayload;
 import com.rabbittick.streamer.global.dto.TickerPayload;
 
 class UpbitDataConverterTest {
@@ -159,13 +159,13 @@ class UpbitDataConverterTest {
 	}
 
 	@Test
-	@DisplayName("정상적인 CommonOrderBookDto를 표준 메시지로 변환한다")
+	@DisplayName("정상적인 CommonOrderbookDto를 표준 메시지로 변환한다")
 	void convertOrderBookData_WithValidDto_ShouldReturnStandardMessage() {
 		// given
-		CommonOrderBookDto upbitDto = createValidCommonOrderBookDto();
+		CommonOrderbookDto upbitDto = createValidCommonOrderbookDto();
 
 		// when
-		MarketDataMessage<OrderBookPayload> result = converter.convertOrderBookData(upbitDto);
+		MarketDataMessage<OrderbookPayload> result = converter.convertOrderBookData(upbitDto);
 
 		// then
 		assertThat(result).isNotNull();
@@ -176,12 +176,12 @@ class UpbitDataConverterTest {
 		assertThat(metadata.getDataType()).isEqualTo("ORDERBOOK");
 		assertThat(metadata.getExchange()).isEqualTo("UPBIT");
 
-		OrderBookPayload payload = (OrderBookPayload)result.getPayload();
+		OrderbookPayload payload = (OrderbookPayload)result.getPayload();
 		assertThat(payload.getMarketCode()).isEqualTo("KRW-BTC");
 		assertThat(payload.getTotalAskSize()).isEqualByComparingTo(new BigDecimal("12.34"));
 		assertThat(payload.getOrderbookUnits()).hasSize(1);
 
-		OrderBookUnitPayload unit = payload.getOrderbookUnits().get(0);
+		OrderbookUnitPayload unit = payload.getOrderbookUnits().get(0);
 		assertThat(unit.getAskPrice()).isEqualByComparingTo(new BigDecimal("70000000"));
 		assertThat(unit.getBidPrice()).isEqualByComparingTo(new BigDecimal("69900000"));
 	}
@@ -192,14 +192,14 @@ class UpbitDataConverterTest {
 		// when & then
 		assertThatThrownBy(() -> converter.convertOrderBookData(null))
 			.isInstanceOf(IllegalArgumentException.class)
-			.hasMessageContaining("CommonOrderBookDto는 null일 수 없다");
+			.hasMessageContaining("CommonOrderbookDto는 null일 수 없다");
 	}
 
 	@Test
 	@DisplayName("OrderBook 필수 필드가 누락되면 IllegalArgumentException을 발생시킨다")
 	void convertOrderBookData_WithMissingFields_ShouldThrowException() {
 		// given
-		CommonOrderBookDto upbitDto = createValidCommonOrderBookDto();
+		CommonOrderbookDto upbitDto = createValidCommonOrderbookDto();
 		upbitDto.setOrderbookUnits(List.of());
 
 		// when & then
@@ -223,8 +223,8 @@ class UpbitDataConverterTest {
 		return dto;
 	}
 
-	private CommonOrderBookDto createValidCommonOrderBookDto() {
-		CommonOrderBookDto dto = new CommonOrderBookDto();
+	private CommonOrderbookDto createValidCommonOrderbookDto() {
+		CommonOrderbookDto dto = new CommonOrderbookDto();
 		dto.setMarketCode("KRW-BTC");
 		dto.setTimestamp(1672531200000L);
 		dto.setTotalAskSize(new BigDecimal("12.34"));
@@ -234,9 +234,9 @@ class UpbitDataConverterTest {
 		return dto;
 	}
 
-	private CommonOrderBookDto.OrderBookUnit createOrderBookUnit(BigDecimal askPrice, BigDecimal askSize,
+	private CommonOrderbookDto.OrderbookUnit createOrderBookUnit(BigDecimal askPrice, BigDecimal askSize,
 		BigDecimal bidPrice, BigDecimal bidSize) {
-		CommonOrderBookDto.OrderBookUnit unit = new CommonOrderBookDto.OrderBookUnit();
+		CommonOrderbookDto.OrderbookUnit unit = new CommonOrderbookDto.OrderbookUnit();
 		unit.setAskPrice(askPrice);
 		unit.setAskSize(askSize);
 		unit.setBidPrice(bidPrice);

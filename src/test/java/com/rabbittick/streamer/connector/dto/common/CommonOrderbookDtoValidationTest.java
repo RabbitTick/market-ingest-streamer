@@ -15,8 +15,8 @@ import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
 
-@DisplayName("CommonOrderBookDto Validation 테스트")
-class CommonOrderBookDtoValidationTest {
+@DisplayName("CommonOrderbookDto Validation 테스트")
+class CommonOrderbookDtoValidationTest {
 
 	private Validator validator;
 
@@ -30,10 +30,10 @@ class CommonOrderBookDtoValidationTest {
 	@DisplayName("유효한 데이터가 주어지면 검증에 성공한다")
 	void validData_shouldPassValidation() {
 		// given
-		CommonOrderBookDto dto = createValidDto();
+		CommonOrderbookDto dto = createValidDto();
 
 		// when
-		Set<ConstraintViolation<CommonOrderBookDto>> violations = validator.validate(dto);
+		Set<ConstraintViolation<CommonOrderbookDto>> violations = validator.validate(dto);
 
 		// then
 		assertThat(violations).isEmpty();
@@ -43,11 +43,11 @@ class CommonOrderBookDtoValidationTest {
 	@DisplayName("marketCode가 null이면 검증에 실패한다")
 	void nullMarketCode_shouldFailValidation() {
 		// given
-		CommonOrderBookDto dto = createValidDto();
+		CommonOrderbookDto dto = createValidDto();
 		dto.setMarketCode(null);
 
 		// when
-		Set<ConstraintViolation<CommonOrderBookDto>> violations = validator.validate(dto);
+		Set<ConstraintViolation<CommonOrderbookDto>> violations = validator.validate(dto);
 
 		// then
 		assertThat(violations).hasSize(1);
@@ -58,11 +58,11 @@ class CommonOrderBookDtoValidationTest {
 	@DisplayName("orderbookUnits가 null이면 검증에 실패한다")
 	void nullOrderbookUnits_shouldFailValidation() {
 		// given
-		CommonOrderBookDto dto = createValidDto();
+		CommonOrderbookDto dto = createValidDto();
 		dto.setOrderbookUnits(null);
 
 		// when
-		Set<ConstraintViolation<CommonOrderBookDto>> violations = validator.validate(dto);
+		Set<ConstraintViolation<CommonOrderbookDto>> violations = validator.validate(dto);
 
 		// then
 		assertThat(violations).hasSize(1);
@@ -73,11 +73,11 @@ class CommonOrderBookDtoValidationTest {
 	@DisplayName("orderbookUnits가 비어있으면 검증에 실패한다")
 	void emptyOrderbookUnits_shouldFailValidation() {
 		// given
-		CommonOrderBookDto dto = createValidDto();
+		CommonOrderbookDto dto = createValidDto();
 		dto.setOrderbookUnits(List.of());
 
 		// when
-		Set<ConstraintViolation<CommonOrderBookDto>> violations = validator.validate(dto);
+		Set<ConstraintViolation<CommonOrderbookDto>> violations = validator.validate(dto);
 
 		// then
 		assertThat(violations).hasSize(1);
@@ -88,11 +88,11 @@ class CommonOrderBookDtoValidationTest {
 	@DisplayName("음수 타임스탬프는 검증에 실패한다")
 	void negativeTimestamp_shouldFailValidation() {
 		// given
-		CommonOrderBookDto dto = createValidDto();
+		CommonOrderbookDto dto = createValidDto();
 		dto.setTimestamp(-1L);
 
 		// when
-		Set<ConstraintViolation<CommonOrderBookDto>> violations = validator.validate(dto);
+		Set<ConstraintViolation<CommonOrderbookDto>> violations = validator.validate(dto);
 
 		// then
 		assertThat(violations).hasSize(1);
@@ -103,19 +103,19 @@ class CommonOrderBookDtoValidationTest {
 	@DisplayName("호가 단위의 필수 필드가 없으면 검증에 실패한다")
 	void invalidOrderbookUnit_shouldFailValidation() {
 		// given
-		CommonOrderBookDto dto = createValidDto();
+		CommonOrderbookDto dto = createValidDto();
 		dto.getOrderbookUnits().get(0).setAskPrice(null);
 
 		// when
-		Set<ConstraintViolation<CommonOrderBookDto>> violations = validator.validate(dto);
+		Set<ConstraintViolation<CommonOrderbookDto>> violations = validator.validate(dto);
 
 		// then
 		assertThat(violations).hasSize(1);
 		assertThat(violations.iterator().next().getMessage()).isEqualTo("매도 호가 가격은 필수값입니다");
 	}
 
-	private CommonOrderBookDto createValidDto() {
-		CommonOrderBookDto dto = new CommonOrderBookDto();
+	private CommonOrderbookDto createValidDto() {
+		CommonOrderbookDto dto = new CommonOrderbookDto();
 		dto.setMarketCode("KRW-BTC");
 		dto.setTimestamp(System.currentTimeMillis());
 		dto.setTotalAskSize(new BigDecimal("12.34"));
@@ -125,9 +125,9 @@ class CommonOrderBookDtoValidationTest {
 		return dto;
 	}
 
-	private CommonOrderBookDto.OrderBookUnit createUnit(BigDecimal askPrice, BigDecimal askSize,
+	private CommonOrderbookDto.OrderbookUnit createUnit(BigDecimal askPrice, BigDecimal askSize,
 		BigDecimal bidPrice, BigDecimal bidSize) {
-		CommonOrderBookDto.OrderBookUnit unit = new CommonOrderBookDto.OrderBookUnit();
+		CommonOrderbookDto.OrderbookUnit unit = new CommonOrderbookDto.OrderbookUnit();
 		unit.setAskPrice(askPrice);
 		unit.setAskSize(askSize);
 		unit.setBidPrice(bidPrice);
