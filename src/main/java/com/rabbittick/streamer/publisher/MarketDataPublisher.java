@@ -55,9 +55,11 @@ public class MarketDataPublisher {
 	 */
     public Mono<Void> publishAsync(MarketDataMessage<?> message) {
         return Mono.fromCallable(() -> createOutboundMessage(message))
+                .onErrorMap(JsonProcessingException.class, e -> new MessagePublishException("메시지 직렬화 실패", e))
                 .flatMapMany(outbound -> sender.sendWithPublishConfirms(Mono.just(outbound)))
                 .next()
                 .flatMap(result -> handlePublishResult(result, message))
+                .onErrorMap(e -> !(e instanceof MessagePublishException), e -> new MessagePublishException("메시지 발행 실패", e))
                 .doOnSuccess(v -> log.debug("메시지 발행 확인 - Routing Key: {}, Message ID: {}, thread: {}",
                         buildRoutingKey(message), message.getMetadata().getMessageId(), Thread.currentThread().getName()))
                 .doOnError(e -> {

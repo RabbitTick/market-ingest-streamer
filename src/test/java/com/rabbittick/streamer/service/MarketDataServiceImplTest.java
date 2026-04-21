@@ -17,6 +17,7 @@ import reactor.core.publisher.Mono;
 import com.rabbittick.streamer.global.dto.MarketDataMessage;
 import com.rabbittick.streamer.global.dto.Metadata;
 import com.rabbittick.streamer.global.dto.TickerPayload;
+import com.rabbittick.streamer.metrics.IngestThroughputMetrics;
 import com.rabbittick.streamer.publisher.MarketDataPublisher;
 
 @ExtendWith(MockitoExtension.class)
@@ -24,6 +25,9 @@ class MarketDataServiceImplTest {
 
 	@Mock
 	private MarketDataPublisher marketDataPublisher;
+
+	@Mock
+	private IngestThroughputMetrics ingestThroughputMetrics;
 
 	@InjectMocks
 	private MarketDataServiceImpl marketDataService;

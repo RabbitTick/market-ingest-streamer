@@ -14,7 +14,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import static org.mockito.Mockito.lenient;
+import org.reactivestreams.Publisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -23,80 +24,72 @@ import com.rabbittick.streamer.global.dto.MarketDataMessage;
 import com.rabbittick.streamer.global.dto.Metadata;
 import com.rabbittick.streamer.global.dto.OrderbookPayload;
 import com.rabbittick.streamer.global.dto.TickerPayload;
+import com.rabbittick.streamer.metrics.PublishFailureMetrics;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.rabbitmq.OutboundMessage;
+import reactor.rabbitmq.OutboundMessageResult;
+import reactor.rabbitmq.Sender;
 
 @ExtendWith(MockitoExtension.class)
 class MarketDataPublisherTest {
 
 	@Mock
-	private RabbitTemplate rabbitTemplate;
+	private Sender sender;
 
 	@Mock
 	private ObjectMapper objectMapper;
+
+	@Mock
+	private PublishFailureMetrics publishFailureMetrics;
 
 	@InjectMocks
 	private MarketDataPublisher publisher;
 
 	private MarketDataMessage<TickerPayload> tickerMessage;
+	private OutboundMessageResult ackResult;
 
 	private final String exchangeName = "market-data.exchange";
 
 	@BeforeEach
-	void setUp() {
+	void setUp() throws Exception {
 		ReflectionTestUtils.setField(publisher, "exchangeName", exchangeName);
 		tickerMessage = createTickerMessage();
+		ackResult = mock(OutboundMessageResult.class);
+		lenient().when(ackResult.isAck()).thenReturn(true);
+		lenient().when(sender.sendWithPublishConfirms(any())).thenReturn(Flux.just(ackResult));
+		lenient().when(objectMapper.writeValueAsBytes(any())).thenReturn(new byte[0]);
 	}
 
 	@Test
 	@DisplayName("정상적인 메시지를 올바른 라우팅 키로 발행한다")
-	void publishAsync_WithValidMessage_ShouldPublishWithCorrectRoutingKey() throws JsonProcessingException {
-		// given
-		String expectedJson = "{\"metadata\":{...},\"payload\":{...}}";
-		when(objectMapper.writeValueAsString(tickerMessage)).thenReturn(expectedJson);
-
+	void publishAsync_WithValidMessage_ShouldPublishWithCorrectRoutingKey() throws Exception {
 		// when
 		publisher.publishAsync(tickerMessage).block();
 
 		// then
-		ArgumentCaptor<String> routingKeyCaptor = ArgumentCaptor.forClass(String.class);
-		ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
-
-		verify(rabbitTemplate).convertAndSend(
-			eq(exchangeName),
-			routingKeyCaptor.capture(),
-			messageCaptor.capture()
-		);
-
-		String routingKey = routingKeyCaptor.getValue();
-		String jsonMessage = messageCaptor.getValue();
-
-		assertThat(routingKey).isEqualTo("upbit.ticker.KRW-BTC");
-		assertThat(jsonMessage).isEqualTo(expectedJson);
+		OutboundMessage outbound = captureOutboundMessage();
+		assertThat(outbound.getRoutingKey()).isEqualTo("upbit.ticker.KRW-BTC");
+		assertThat(outbound.getExchange()).isEqualTo(exchangeName);
 	}
 
 	@Test
 	@DisplayName("다른 거래소와 마켓코드로 올바른 라우팅 키를 생성한다")
-	void publishAsync_WithDifferentExchangeAndMarket_ShouldGenerateCorrectRoutingKey() throws JsonProcessingException {
+	void publishAsync_WithDifferentExchangeAndMarket_ShouldGenerateCorrectRoutingKey() throws Exception {
 		// given
 		MarketDataMessage<TickerPayload> binanceMessage = createMessageWithExchangeAndMarket("BINANCE", "BTCUSDT");
-		when(objectMapper.writeValueAsString(binanceMessage)).thenReturn("{}");
 
 		// when
 		publisher.publishAsync(binanceMessage).block();
 
 		// then
-		ArgumentCaptor<String> routingKeyCaptor = ArgumentCaptor.forClass(String.class);
-		verify(rabbitTemplate).convertAndSend(
-			eq(exchangeName),
-			routingKeyCaptor.capture(),
-			any(String.class)
-		);
-
-		assertThat(routingKeyCaptor.getValue()).isEqualTo("binance.ticker.BTCUSDT");
+		OutboundMessage outbound = captureOutboundMessage();
+		assertThat(outbound.getRoutingKey()).isEqualTo("binance.ticker.BTCUSDT");
 	}
 
 	@Test
 	@DisplayName("TRADE 데이터 타입으로 올바른 라우팅 키를 생성한다")
-	void publishAsync_WithTradeDataType_ShouldGenerateCorrectRoutingKey() throws JsonProcessingException {
+	void publishAsync_WithTradeDataType_ShouldGenerateCorrectRoutingKey() throws Exception {
 		// given
 		Metadata tradeMetadata = Metadata.builder()
 			.messageId("test-id")
@@ -116,25 +109,17 @@ class MarketDataPublisherTest {
 			.payload(payload)
 			.build();
 
-		when(objectMapper.writeValueAsString(tradeMessage)).thenReturn("{}");
-
 		// when
 		publisher.publishAsync(tradeMessage).block();
 
 		// then
-		ArgumentCaptor<String> routingKeyCaptor = ArgumentCaptor.forClass(String.class);
-		verify(rabbitTemplate).convertAndSend(
-			eq(exchangeName),
-			routingKeyCaptor.capture(),
-			any(String.class)
-		);
-
-		assertThat(routingKeyCaptor.getValue()).isEqualTo("upbit.trade.KRW-ETH");
+		OutboundMessage outbound = captureOutboundMessage();
+		assertThat(outbound.getRoutingKey()).isEqualTo("upbit.trade.KRW-ETH");
 	}
 
 	@Test
 	@DisplayName("ORDERBOOK 데이터 타입으로 올바른 라우팅 키를 생성한다")
-	void publishAsync_WithOrderBookDataType_ShouldGenerateCorrectRoutingKey() throws JsonProcessingException {
+	void publishAsync_WithOrderBookDataType_ShouldGenerateCorrectRoutingKey() throws Exception {
 		// given
 		Metadata metadata = Metadata.builder()
 			.messageId("test-id")
@@ -153,29 +138,20 @@ class MarketDataPublisherTest {
 			.payload(payload)
 			.build();
 
-		when(objectMapper.writeValueAsString(orderBookMessage)).thenReturn("{}");
-
 		// when
 		publisher.publishAsync(orderBookMessage).block();
 
 		// then
-		ArgumentCaptor<String> routingKeyCaptor = ArgumentCaptor.forClass(String.class);
-		verify(rabbitTemplate).convertAndSend(
-			eq(exchangeName),
-			routingKeyCaptor.capture(),
-			any(String.class)
-		);
-
-		assertThat(routingKeyCaptor.getValue()).isEqualTo("upbit.orderbook.KRW-BTC");
+		OutboundMessage outbound = captureOutboundMessage();
+		assertThat(outbound.getRoutingKey()).isEqualTo("upbit.orderbook.KRW-BTC");
 	}
 
 	@Test
 	@DisplayName("JSON 직렬화 실패 시 Mono가 MessagePublishException으로 실패한다")
-	void publishAsync_WhenJsonSerializationFails_ShouldEmitMessagePublishException() throws JsonProcessingException {
+	void publishAsync_WhenJsonSerializationFails_ShouldEmitMessagePublishException() throws Exception {
 		// given
-		JsonProcessingException jsonException = new JsonProcessingException("JSON 변환 실패") {
-		};
-		when(objectMapper.writeValueAsString(tickerMessage)).thenThrow(jsonException);
+		JsonProcessingException jsonException = new JsonProcessingException("JSON 변환 실패") {};
+		when(objectMapper.writeValueAsBytes(tickerMessage)).thenThrow(jsonException);
 
 		// when & then
 		assertThatThrownBy(() -> publisher.publishAsync(tickerMessage).block())
@@ -185,12 +161,11 @@ class MarketDataPublisherTest {
 	}
 
 	@Test
-	@DisplayName("RabbitTemplate에서 예외 발생 시 MessagePublishException으로 Mono가 실패한다")
-	void publishAsync_WhenRabbitTemplateThrows_ShouldEmitError() throws JsonProcessingException {
+	@DisplayName("Sender에서 예외 발생 시 MessagePublishException으로 Mono가 실패한다")
+	void publishAsync_WhenSenderThrows_ShouldEmitError() throws Exception {
 		// given
-		when(objectMapper.writeValueAsString(tickerMessage)).thenReturn("{}");
-		doThrow(new RuntimeException("RabbitMQ 연결 실패")).when(rabbitTemplate)
-			.convertAndSend(any(String.class), any(String.class), any(String.class));
+		when(sender.sendWithPublishConfirms(any()))
+			.thenReturn(Flux.error(new RuntimeException("RabbitMQ 연결 실패")));
 
 		// when & then
 		assertThatThrownBy(() -> publisher.publishAsync(tickerMessage).block())
@@ -201,23 +176,16 @@ class MarketDataPublisherTest {
 
 	@Test
 	@DisplayName("마켓코드에 특수문자가 있어도 라우팅 키를 올바르게 생성한다")
-	void publishAsync_WithSpecialCharactersInMarketCode_ShouldHandleCorrectly() throws JsonProcessingException {
+	void publishAsync_WithSpecialCharactersInMarketCode_ShouldHandleCorrectly() throws Exception {
 		// given
 		MarketDataMessage<TickerPayload> message = createMessageWithExchangeAndMarket("UPBIT", "KRW-BTC");
-		when(objectMapper.writeValueAsString(message)).thenReturn("{}");
 
 		// when
 		publisher.publishAsync(message).block();
 
 		// then
-		ArgumentCaptor<String> routingKeyCaptor = ArgumentCaptor.forClass(String.class);
-		verify(rabbitTemplate).convertAndSend(
-			eq(exchangeName),
-			routingKeyCaptor.capture(),
-			any(String.class)
-		);
-
-		assertThat(routingKeyCaptor.getValue()).isEqualTo("upbit.ticker.KRW-BTC");
+		OutboundMessage outbound = captureOutboundMessage();
+		assertThat(outbound.getRoutingKey()).isEqualTo("upbit.ticker.KRW-BTC");
 	}
 
 	@Test
@@ -230,26 +198,26 @@ class MarketDataPublisherTest {
 
 	@Test
 	@DisplayName("대소문자 변환이 올바르게 적용된다")
-	void publishAsync_ShouldConvertToLowerCase() throws JsonProcessingException {
+	void publishAsync_ShouldConvertToLowerCase() throws Exception {
 		// given
 		MarketDataMessage<TickerPayload> message = createMessageWithExchangeAndMarket("UPBIT", "KRW-BTC");
-		when(objectMapper.writeValueAsString(message)).thenReturn("{}");
 
 		// when
 		publisher.publishAsync(message).block();
 
 		// then
-		ArgumentCaptor<String> routingKeyCaptor = ArgumentCaptor.forClass(String.class);
-		verify(rabbitTemplate).convertAndSend(
-			eq(exchangeName),
-			routingKeyCaptor.capture(),
-			any(String.class)
-		);
-
-		String routingKey = routingKeyCaptor.getValue();
-
+		OutboundMessage outbound = captureOutboundMessage();
+		String routingKey = outbound.getRoutingKey();
 		assertThat(routingKey).matches("^[a-z]+\\.[a-z]+\\..+$");
 		assertThat(routingKey).isEqualTo("upbit.ticker.KRW-BTC");
+	}
+
+	@SuppressWarnings("unchecked")
+	private OutboundMessage captureOutboundMessage() {
+		ArgumentCaptor<Publisher<OutboundMessage>> captor =
+			ArgumentCaptor.forClass((Class<Publisher<OutboundMessage>>) (Class<?>) Publisher.class);
+		verify(sender).sendWithPublishConfirms(captor.capture());
+		return Mono.from(captor.getValue()).block();
 	}
 
 	private MarketDataMessage<TickerPayload> createTickerMessage() {
